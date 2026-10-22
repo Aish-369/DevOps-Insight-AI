@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import {
   Activity,
@@ -9,26 +9,42 @@ import {
   LogOut,
   ShieldCheck,
   Workflow,
+  ArrowRight,
+  RefreshCw,
 } from "lucide-react";
 
 import { supabase } from "../lib/supabase";
 
-// Import the matching dashboard CSS file.
+import {
+  getSavedGitHubUsername,
+  useGitHubRepositories,
+} from "../hooks/useGitHubRepositories";
+
 import "../styles/DashboardPage.css";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
 
-  // Store the signed-in user's name.
   const [userName, setUserName] = useState("Developer");
   const [logoutError, setLogoutError] = useState("");
 
-  useEffect(() => {
-    // Load the current user's profile from Supabase.
-    async function loadUser() {
-      const { data, error } = await supabase.auth.getUser();
+  // Read the username previously saved on the repositories page.
+  const [githubUsername] = useState(getSavedGitHubUsername);
 
-      if (error || !data.user) {
+  // Fetch real public repository data.
+  const {
+    repositories,
+    loading,
+    error,
+  } = useGitHubRepositories(githubUsername);
+
+  useEffect(() => {
+    // Load the signed-in user's name.
+    async function loadUser() {
+      const { data, error: userError } =
+        await supabase.auth.getUser();
+
+      if (userError || !data.user) {
         return;
       }
 
@@ -41,40 +57,48 @@ export default function DashboardPage() {
     void loadUser();
   }, []);
 
-  // Sign out the user and return to the login page.
+  // Sign out using Supabase Authentication.
   async function handleLogout() {
     setLogoutError("");
 
-    const { error } = await supabase.auth.signOut();
+    const { error: signOutError } =
+      await supabase.auth.signOut();
 
-    if (error) {
-      setLogoutError(error.message);
+    if (signOutError) {
+      setLogoutError(signOutError.message);
       return;
     }
 
     navigate("/login", { replace: true });
   }
 
-  // Show empty values until real GitHub data is connected.
+  // Repository count comes from the real GitHub API.
+  // Other metrics remain unavailable until their APIs exist.
   const stats = [
     {
-      label: "Repositories",
-      value: "0",
+      label: "Public Repositories",
+      value: !githubUsername
+        ? "—"
+        : loading
+          ? "..."
+          : error
+            ? "—"
+            : String(repositories.length),
       icon: GitBranch,
     },
     {
       label: "Pipeline Runs",
-      value: "0",
+      value: "—",
       icon: Workflow,
     },
     {
       label: "Active Alerts",
-      value: "0",
+      value: "—",
       icon: Activity,
     },
     {
       label: "Connected Teams",
-      value: "0",
+      value: "—",
       icon: ShieldCheck,
     },
   ];
@@ -87,32 +111,36 @@ export default function DashboardPage() {
           DevOps Insight AI
         </h2>
 
-        {/* Sidebar navigation */}
-        <nav className="dashboard-nav" aria-label="Dashboard navigation">
-          <div className="dashboard-nav-item active">
+        <nav className="dashboard-nav">
+          <Link
+            to="/dashboard"
+            className="dashboard-nav-item active"
+          >
             <LayoutDashboard size={19} />
             <span>Overview</span>
-          </div>
+          </Link>
 
-          <div className="dashboard-nav-item">
+          <Link
+            to="/repositories"
+            className="dashboard-nav-item"
+          >
             <GitBranch size={19} />
             <span>Repositories</span>
-          </div>
+          </Link>
 
           <div className="dashboard-nav-item">
             <Workflow size={19} />
-            <span>Pipelines</span>
+            <span>Pipelines (Coming soon)</span>
           </div>
         </nav>
 
-        {/* Logout */}
         <button
           type="button"
           className="dashboard-logout"
           onClick={handleLogout}
         >
           <LogOut size={19} />
-          <span>Sign out</span>
+          Sign out
         </button>
 
         {logoutError && (
@@ -124,7 +152,6 @@ export default function DashboardPage() {
 
       {/* Main dashboard */}
       <main className="dashboard-main">
-        {/* Welcome section */}
         <header className="dashboard-header">
           <p className="dashboard-eyebrow">
             Workspace overview
@@ -135,23 +162,19 @@ export default function DashboardPage() {
           </h1>
 
           <p className="dashboard-description">
-            Monitor repositories, CI/CD pipelines and
-            development activity from one workspace.
+            Your DevOps monitoring workspace.
           </p>
         </header>
 
-        {/* Statistics */}
-        <section
-          className="dashboard-stats"
-          aria-label="Workspace statistics"
-        >
+        {/* Statistics cards */}
+        <section className="dashboard-stats">
           {stats.map((stat) => {
             const Icon = stat.icon;
 
             return (
               <article
-                key={stat.label}
                 className="dashboard-stat-card"
+                key={stat.label}
               >
                 <div className="dashboard-stat-icon">
                   <Icon size={22} />
@@ -169,39 +192,71 @@ export default function DashboardPage() {
           })}
         </section>
 
-        {/* Repository section */}
+        {/* GitHub repositories overview */}
         <section className="dashboard-panel">
           <div className="dashboard-empty-icon">
             <GitBranch size={26} />
           </div>
 
           <h2 className="dashboard-panel-title">
-            Your repositories
+            GitHub Repositories
           </h2>
 
-          <p className="dashboard-panel-text">
-            No repositories connected yet. Once GitHub
-            integration is ready, you will be able to
-            monitor repository activity and CI/CD pipeline
-            failures from this dashboard.
-          </p>
+          {githubUsername ? (
+            <>
+              <p className="dashboard-panel-text">
+                Viewing public repositories for{" "}
+                <strong>@{githubUsername}</strong>.
+              </p>
 
-          <span className="dashboard-coming-soon">
-            GitHub integration coming soon
-          </span>
+              {loading ? (
+                <p className="dashboard-panel-text">
+                  Loading repository data...
+                </p>
+              ) : error ? (
+                <p className="dashboard-panel-text" role="alert">
+                  {error}
+                </p>
+              ) : (
+                <p className="dashboard-panel-text">
+                  {repositories.length} public repositories
+                  loaded from GitHub.
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="dashboard-panel-text">
+              Explore GitHub repositories by entering
+              a public GitHub username.
+            </p>
+          )}
+
+          <Link
+            to="/repositories"
+            className="dashboard-github-link"
+          >
+            {githubUsername
+              ? "View repositories"
+              : "Explore GitHub"}
+            <ArrowRight size={17} />
+          </Link>
         </section>
 
-        {/* Recent activity section */}
+        {/* Recent activity */}
         <section className="dashboard-panel">
           <h2 className="dashboard-panel-title">
             Recent activity
           </h2>
 
           <p className="dashboard-panel-text">
-            No recent activity yet. Pipeline events and
-            repository updates will appear here after
-            you connect your GitHub account.
+            CI/CD activity monitoring will be available
+            after GitHub Actions integration.
           </p>
+
+          <span className="dashboard-coming-soon">
+            <RefreshCw size={14} />
+            Coming soon
+          </span>
         </section>
       </main>
     </div>

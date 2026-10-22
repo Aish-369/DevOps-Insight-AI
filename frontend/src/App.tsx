@@ -1,21 +1,31 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+
+import {
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import DashboardPage from "./pages/DashboardPage";
+import RepositoriesPage from "./pages/RepositoriesPage";
+
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 export default function App() {
   return (
     <Routes>
-      {/* Redirect the homepage to login. */}
-      <Route path="/" element={<Navigate to="/login" replace />} />
+      {/* Default route */}
+      <Route
+        path="/"
+        element={<Navigate to="/login" replace />}
+      />
 
-      {/* Public authentication pages. */}
+      {/* Public authentication pages */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
 
-      {/* Only authenticated users can access the dashboard. */}
+      {/* Protected dashboard */}
       <Route
         path="/dashboard"
         element={
@@ -25,8 +35,21 @@ export default function App() {
         }
       />
 
-      {/* Redirect unknown routes. */}
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      {/* Protected GitHub repositories page */}
+      <Route
+        path="/repositories"
+        element={
+          <ProtectedRoute>
+            <RepositoriesPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Unknown routes */}
+      <Route
+        path="*"
+        element={<Navigate to="/login" replace />}
+      />
     </Routes>
   );
 }
