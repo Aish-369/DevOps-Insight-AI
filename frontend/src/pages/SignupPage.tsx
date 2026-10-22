@@ -1,113 +1,193 @@
 
 import { useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
+// Import the matching signup CSS file.
+import "../styles/SignupPage.css";
+
 export default function SignupPage() {
+  const navigate = useNavigate();
+
+  // Store form input values.
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  // Store loading and feedback messages.
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  async function handleSignup(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setMessage("");
+  // Create a new user with Supabase Authentication.
+  async function handleSignup(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
 
+    setError("");
+    setSuccess("");
+
+    // Validate the password.
     if (password.length < 8) {
-      setMessage("Use at least 8 characters for your password.");
+      setError("Password must contain at least 8 characters.");
+      return;
+    }
+
+    // Make sure both passwords match.
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
       return;
     }
 
     setLoading(true);
 
     try {
-      // Create a real Supabase user account.
-      const { error } = await supabase.auth.signUp({
+      const { data, error: signupError } = await supabase.auth.signUp({
         email: email.trim(),
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/login`,
+          // Save the user's full name.
+          data: {
+            full_name: name.trim(),
+          },
         },
       });
 
-      if (error) {
-        setMessage("Signup could not be completed. Please try again.");
+      if (signupError) {
+        setError(signupError.message);
         return;
       }
 
-      // Do not claim the email was sent or the account was created
-      // without checking the provider's actual response.
-      setMessage(
-        "Request processed. If confirmation is required, check your email."
-      );
+      if (data.session) {
+        // Redirect when the user is already authenticated.
+        navigate("/dashboard", { replace: true });
+      } else {
+        // Email verification may be enabled in Supabase.
+        setSuccess(
+          "Account created! Please check your email for verification."
+        );
+      }
     } catch {
-      setMessage("Something went wrong. Please try again.");
+      setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#fff5e8] p-5">
-      <div className="clay-card w-full max-w-md rounded-[32px] p-8">
-        <h1 className="text-3xl font-extrabold">
-          Create your workspace
+    <main className="signup-page">
+      <section className="signup-card">
+        {/* Brand */}
+        <div className="signup-brand">
+          DevOps Insight AI
+        </div>
+
+        {/* Page heading */}
+        <h1 className="signup-title">
+          Create your account
         </h1>
-        <p className="mt-2 text-[#68756d]">
-          Join DevOps Insight AI
+
+        <p className="signup-subtitle">
+          Join DevOps Insight AI and manage your development
+          workflows from one intelligent workspace.
         </p>
 
-        <form onSubmit={handleSignup} className="mt-8 space-y-5">
-          <div>
-            <label htmlFor="signup-email" className="mb-2 block font-semibold">
-              Work email
-            </label>
+        {/* Signup form */}
+        <form className="signup-form" onSubmit={handleSignup}>
+          <div className="signup-field">
+            <label htmlFor="signup-name">Full name</label>
+
+            <input
+              id="signup-name"
+              className="signup-input"
+              type="text"
+              placeholder="Enter your full name"
+              autoComplete="name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              required
+            />
+          </div>
+
+          <div className="signup-field">
+            <label htmlFor="signup-email">Email address</label>
+
             <input
               id="signup-email"
+              className="signup-input"
               type="email"
-              required
+              placeholder="you@example.com"
               autoComplete="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="clay-input w-full rounded-2xl p-4 outline-none"
-              placeholder="you@company.com"
+              onChange={(event) => setEmail(event.target.value)}
+              required
             />
           </div>
 
-          <div>
-            <label htmlFor="signup-password" className="mb-2 block font-semibold">
-              Password
-            </label>
+          <div className="signup-field">
+            <label htmlFor="signup-password">Password</label>
+
             <input
               id="signup-password"
+              className="signup-input"
               type="password"
-              required
-              minLength={8}
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="clay-input w-full rounded-2xl p-4 outline-none"
               placeholder="Minimum 8 characters"
+              autoComplete="new-password"
+              minLength={8}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
             />
           </div>
 
-          {message && <p role="status" className="text-sm">{message}</p>}
+          <div className="signup-field">
+            <label htmlFor="signup-confirm-password">
+              Confirm password
+            </label>
+
+            <input
+              id="signup-confirm-password"
+              className="signup-input"
+              type="password"
+              placeholder="Confirm your password"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(event) =>
+                setConfirmPassword(event.target.value)
+              }
+              required
+            />
+          </div>
+
+          {/* Display an error when signup fails. */}
+          {error && (
+            <p className="signup-error" role="alert">
+              {error}
+            </p>
+          )}
+
+          {/* Display the verification message. */}
+          {success && (
+            <p className="signup-success" role="status">
+              {success}
+            </p>
+          )}
 
           <button
+            className="signup-button"
+            type="submit"
             disabled={loading}
-            className="w-full rounded-2xl bg-[#e99d7f] p-4 font-bold disabled:opacity-60"
           >
-            {loading ? "Creating account..." : "Create Account"}
+            {loading ? "Creating account..." : "Create account"}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm">
-          Already registered?{" "}
-          <Link to="/login" className="font-bold text-[#476c5a]">
-            Sign In
-          </Link>
+        {/* Link to the existing login page. */}
+        <p className="signup-footer">
+          Already have an account?{" "}
+          <Link to="/login">Sign in</Link>
         </p>
-      </div>
+      </section>
     </main>
   );
 }
