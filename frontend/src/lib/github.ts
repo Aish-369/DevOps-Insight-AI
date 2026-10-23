@@ -1,4 +1,4 @@
-
+import { cachedFetchJson } from "./apiCache";
 const GITHUB_API_URL = "https://api.github.com";
 
 // Define the repository data we use in the UI.
