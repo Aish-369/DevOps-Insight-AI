@@ -128,10 +128,11 @@ export default function DashboardPage() {
             <span>Repositories</span>
           </Link>
 
-          <div className="dashboard-nav-item">
-            <Workflow size={19} />
-            <span>Pipelines (Coming soon)</span>
-          </div>
+          {/* Navigate to the real CI/CD pipelines page */}
+<Link to="/pipelines" className="dashboard-nav-item">
+  <Workflow size={19} />
+  <span>Pipelines</span>
+</Link>
         </nav>
 
         <button

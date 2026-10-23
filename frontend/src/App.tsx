@@ -1,14 +1,11 @@
 
-import {
-  Routes,
-  Route,
-  Navigate,
-} from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import DashboardPage from "./pages/DashboardPage";
 import RepositoriesPage from "./pages/RepositoriesPage";
+import PipelinesPage from "./pages/PipelinesPage";
 
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
@@ -35,12 +32,22 @@ export default function App() {
         }
       />
 
-      {/* Protected GitHub repositories page */}
+      {/* Protected repositories page */}
       <Route
         path="/repositories"
         element={
           <ProtectedRoute>
             <RepositoriesPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Protected pipelines page */}
+      <Route
+        path="/pipelines"
+        element={
+          <ProtectedRoute>
+            <PipelinesPage />
           </ProtectedRoute>
         }
       />

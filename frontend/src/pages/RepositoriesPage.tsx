@@ -1,7 +1,7 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { extractGitHubUsername } from "../lib/github";
+
 import {
   ArrowLeft,
   Search,
