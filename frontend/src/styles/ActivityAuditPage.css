@@ -1,0 +1,389 @@
+
+/* Make each commit title an accessible, clickable control. */
+.audit-commit-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.audit-commit-toggle span {
+  overflow-wrap: anywhere;
+}
+
+.audit-commit-toggle:hover {
+  opacity: 0.8;
+}
+
+/* Separate the details from the commit summary. */
+.audit-commit-details {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+.audit-commit-details h4 {
+  margin: 12px 0;
+  font-size: 15px;
+}
+
+.audit-change-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.audit-additions {
+  color: #16a34a;
+}
+
+.audit-deletions {
+  color: #dc2626;
+}
+
+/* Display the changed file list. */
+.audit-file-list {
+  display: grid;
+  gap: 10px;
+}
+
+.audit-file {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+}
+
+.audit-file summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.audit-file-name {
+  flex: 1;
+  min-width: 120px;
+  overflow-wrap: anywhere;
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.audit-file-status {
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.audit-file-stats {
+  margin: 10px 0;
+  font-size: 12px;
+}
+
+/* Keep long code lines scrollable instead of breaking the page. */
+.audit-patch {
+  max-width: 100%;
+  max-height: 360px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 6px;
+  background: var(--patch-background, #f3f4f6);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre;
+}
+
+.audit-patch code {
+  font-family: Consolas, Monaco, monospace;
+}
+
+.audit-commit-details a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+
+/* Activity Audit page layout */
+.audit-page {
+  min-height: 100vh;
+  padding: 40px 24px;
+  background: #faf9f6;
+  color: #263b3a;
+}
+
+.audit-container {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* Back navigation */
+.audit-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 28px;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.audit-back:hover {
+  text-decoration: underline;
+}
+
+/* Page header */
+.audit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 30px;
+}
+
+.audit-eyebrow {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.audit-header h1 {
+  margin: 0 0 12px;
+  font-size: clamp(28px, 4vw, 38px);
+  line-height: 1.2;
+}
+
+.audit-header p {
+  line-height: 1.6;
+}
+
+.audit-header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+}
+
+/* Main panels */
+
+.audit-commit {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid #e9ebf3;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.audit-panel h2 {
+  margin: 0 0 20px;
+  font-size: 20px;
+}
+
+/* Repository selection */
+.audit-search {
+  margin-bottom: 20px;
+}
+
+.audit-search label,
+.audit-panel > label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.audit-search-row {
+  display: flex;
+  gap: 12px;
+}
+
+.audit-search-row input,
+.audit-panel select {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: inherit;
+  font: inherit;
+}
+
+.audit-search-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.audit-panel select {
+  width: 100%;
+  max-width: 500px;
+}
+
+.audit-search-row button,
+.audit-refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 18px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.audit-search-row button:hover,
+.audit-refresh:hover {
+  background: #f3f4f6;
+}
+
+.audit-search-row button:disabled,
+.audit-refresh:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.audit-hint,
+.audit-status {
+  margin-top: 14px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.audit-error {
+  padding: 12px;
+  color: #b91c1c;
+  background: #fef2f2;
+  border-radius: 8px;
+}
+
+/* Recent commits header */
+.audit-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.audit-section-heading h2 {
+  margin-bottom: 6px;
+}
+
+.audit-section-heading p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+/* Commit timeline */
+.audit-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.audit-commit {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.audit-commit-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: #f3f4f6;
+}
+
+.audit-commit-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.audit-commit-meta {
+  margin: 10px 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.audit-commit-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13px;
+}
+
+.audit-commit-footer a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.audit-commit-footer a:hover {
+  text-decoration: underline;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .audit-page {
+    padding: 20px 14px;
+  }
+
+  .audit-header {
+    align-items: flex-start;
+  }
+
+  .audit-header-icon {
+    display: none;
+  }
+
+  .audit-panel {
+    padding: 18px;
+  }
+
+  .audit-search-row {
+    flex-direction: column;
+  }
+
+  .audit-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

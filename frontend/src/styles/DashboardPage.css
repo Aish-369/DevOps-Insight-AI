@@ -1,10 +1,9 @@
 
 /* ==========================================
-   DEVOPS INSIGHT AI - DASHBOARD DESIGN
-   Clean, modern and responsive SaaS UI
+   DEVOPS INSIGHT AI - ORIGINAL DASHBOARD
+   Restored from GitHub version
    ========================================== */
 
-/* Main dashboard layout */
 .dashboard-layout {
   display: flex;
   min-height: 100vh;
@@ -18,9 +17,7 @@
   box-sizing: border-box;
 }
 
-/* ==========================================
-   SIDEBAR
-   ========================================== */
+/* SIDEBAR */
 
 .dashboard-sidebar {
   width: 255px;
@@ -42,7 +39,6 @@
   color: #6254c7;
 }
 
-/* Sidebar navigation */
 .dashboard-nav {
   display: flex;
   flex-direction: column;
@@ -74,7 +70,6 @@
   font-weight: 700;
 }
 
-/* Logout button */
 .dashboard-logout {
   display: flex;
   align-items: center;
@@ -103,9 +98,7 @@
   color: #c53e56;
 }
 
-/* ==========================================
-   MAIN CONTENT
-   ========================================== */
+/* MAIN CONTENT */
 
 .dashboard-main {
   flex: 1;
@@ -141,9 +134,7 @@
   line-height: 1.7;
 }
 
-/* ==========================================
-   STATISTICS CARDS
-   ========================================== */
+/* STATISTICS CARDS */
 
 .dashboard-stats {
   display: grid;
@@ -209,9 +200,7 @@
   letter-spacing: -1px;
 }
 
-/* ==========================================
-   DASHBOARD PANELS
-   ========================================== */
+/* DASHBOARD PANELS */
 
 .dashboard-panel {
   margin-bottom: 24px;
@@ -240,7 +229,6 @@
   color: #6e5dce;
 }
 
-/* GitHub panel icon */
 .dashboard-empty-icon {
   display: flex;
   align-items: center;
@@ -253,7 +241,6 @@
   color: #7464d2;
 }
 
-/* GitHub repositories button */
 .dashboard-github-link {
   display: inline-flex;
   align-items: center;
@@ -275,7 +262,6 @@
   transform: translateY(-2px);
 }
 
-/* Coming soon status */
 .dashboard-coming-soon {
   display: inline-flex;
   align-items: center;
@@ -288,9 +274,90 @@
   font-weight: 700;
 }
 
-/* ==========================================
-   RESPONSIVE DESIGN
-   ========================================== */
+/* RECENT ACTIVITY - MATCH ORIGINAL DESIGN */
+
+.dashboard-activity-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dashboard-activity-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: 20px;
+}
+
+.dashboard-activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 0;
+  border-bottom: 1px solid #e9ebf3;
+}
+
+.dashboard-activity-item:last-child {
+  border-bottom: none;
+}
+
+.dashboard-activity-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: #f0edff;
+  color: #7464d2;
+}
+
+.dashboard-activity-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.dashboard-activity-message {
+  margin: 0 0 8px;
+  color: #292d43;
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-activity-meta {
+  margin: 0;
+  color: #9197a8;
+  font-size: 12px;
+}
+
+.dashboard-commit-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  color: #7061d1;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.dashboard-commit-link:hover {
+  text-decoration: underline;
+}
+
+.activity-spinning {
+  animation: activity-spin 1s linear infinite;
+}
+
+@keyframes activity-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* RESPONSIVE DESIGN */
 
 @media (max-width: 1200px) {
   .dashboard-stats {
@@ -364,5 +431,9 @@
 
   .dashboard-stat-value {
     font-size: 28px;
+  }
+
+  .dashboard-activity-heading {
+    flex-direction: column;
   }
 }
