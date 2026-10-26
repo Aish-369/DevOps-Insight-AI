@@ -387,3 +387,232 @@
     flex-direction: column;
   }
 }
+
+/* ==========================================
+   ACTIVITY AUDIT — PREMIUM PURPLE THEME
+   Matches the existing Dashboard palette
+   ========================================== */
+
+.audit-page {
+  background: #f7f8fc;
+  color: #252940;
+}
+
+.audit-eyebrow {
+  color: #7869d4;
+}
+
+.audit-header h1 {
+  color: #252940;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+}
+
+.audit-header-icon {
+  background: #f0edff;
+  border-color: #e5e0ff;
+  color: #7061d1;
+  box-shadow: 0 6px 20px rgba(38, 44, 88, 0.04);
+}
+
+/* Soft purple panels */
+.audit-panel {
+  background: #f0edff;
+  border: 1px solid #e5e0ff;
+  border-radius: 20px;
+  box-shadow: 0 8px 30px rgba(38, 44, 88, 0.04);
+}
+
+.audit-panel h2 {
+  color: #292d43;
+  font-weight: 750;
+}
+
+/* Inputs */
+.audit-search-row input,
+.audit-panel select {
+  background: #ffffff;
+  border: 1px solid #dcd7f3;
+  border-radius: 10px;
+}
+
+.audit-search-row input:focus,
+.audit-panel select:focus {
+  outline: 2px solid #c9c0ff;
+  outline-offset: 2px;
+}
+
+/* Purple action buttons */
+.audit-search-row button,
+.audit-refresh {
+  background: #7061d1;
+  border: 1px solid #7061d1;
+  border-radius: 10px;
+  color: #ffffff;
+  font-weight: 700;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.audit-search-row button:hover,
+.audit-refresh:hover {
+  background: #5b4bb9;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.audit-search-row button:disabled,
+.audit-refresh:disabled {
+  opacity: 0.55;
+  transform: none;
+}
+
+/* Commit cards */
+.audit-commit {
+  background: #ffffff;
+  border: 1px solid #e9e5f8;
+  border-radius: 14px;
+  box-shadow: 0 3px 12px rgba(38, 44, 88, 0.025);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.audit-commit:hover {
+  border-color: #c9c0ff;
+  box-shadow: 0 7px 20px rgba(38, 44, 88, 0.06);
+}
+
+.audit-commit-icon {
+  background: #f0edff;
+  color: #7061d1;
+  border-radius: 12px;
+}
+
+.audit-commit-toggle:hover {
+  color: #6254c7;
+  opacity: 1;
+}
+
+.audit-commit-meta,
+.audit-section-heading p {
+  color: #858ba1;
+}
+
+.audit-commit-footer a,
+.audit-commit-details a {
+  color: #7061d1;
+}
+
+.audit-commit-footer a:hover,
+.audit-commit-details a:hover {
+  color: #5b4bb9;
+}
+
+/* Expanded commit details */
+.audit-commit-details {
+  border-top-color: #e9e5f8;
+}
+
+.audit-file {
+  background: #fbfaff;
+  border-color: #e5e0f5;
+  border-radius: 10px;
+}
+
+.audit-file summary:hover {
+  color: #6254c7;
+}
+
+.audit-patch {
+  background: #f4f2fc;
+  border: 1px solid #e9e5f8;
+}
+
+/* Keyboard accessibility */
+.audit-back:focus-visible,
+.audit-commit-toggle:focus-visible,
+.audit-refresh:focus-visible,
+.audit-search-row button:focus-visible {
+  outline: 2px solid #7061d1;
+  outline-offset: 3px;
+}
+
+/* Refine Activity Audit — balanced colors and spacing */
+
+.audit-page {
+  background: #faf9f6;
+  color: #252940;
+  padding: 32px 24px;
+}
+
+.audit-container {
+  max-width: 1100px;
+}
+
+.audit-header {
+  margin-bottom: 24px;
+}
+
+.audit-panel {
+  padding: 24px;
+  margin-bottom: 20px;
+  background: #f0edff;
+  border: 1px solid #e5e0ff;
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+.audit-panel h2 {
+  font-size: 19px;
+}
+
+.audit-section-heading {
+  margin-bottom: 18px;
+}
+
+.audit-timeline {
+  gap: 12px;
+}
+
+.audit-commit {
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #e9ebf3;
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.audit-commit:hover {
+  border-color: #d4ccff;
+}
+
+.audit-commit-icon {
+  background: #f0edff;
+  color: #7061d1;
+}
+
+.audit-search-row button,
+.audit-refresh {
+  background: #7061d1;
+  border-color: #7061d1;
+  color: #ffffff;
+}
+
+.audit-search-row button:hover,
+.audit-refresh:hover {
+  background: #5b4bb9;
+  color: #ffffff;
+}
+
+@media (max-width: 640px) {
+  .audit-page {
+    padding: 20px 14px;
+  }
+
+  .audit-panel {
+    padding: 16px;
+  }
+
+  .audit-commit {
+    padding: 12px;
+  }
+}
+

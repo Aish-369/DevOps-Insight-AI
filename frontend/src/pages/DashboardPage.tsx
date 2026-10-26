@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-
+import "../styles/DashboardPage.css";
 import {
   Activity,
   GitBranch,
@@ -20,7 +20,12 @@ import {
   useGitHubRepositories,
 } from "../hooks/useGitHubRepositories";
 
-import "../styles/DashboardPage.css";
+import {
+  fetchRepositoryCommits,
+  type GitHubCommit,
+} from "../lib/githubActivity";
+
+
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -28,18 +33,28 @@ export default function DashboardPage() {
   const [userName, setUserName] = useState("Developer");
   const [logoutError, setLogoutError] = useState("");
 
-  // Read the username previously saved on the repositories page.
+  // Read the saved GitHub username.
   const [githubUsername] = useState(getSavedGitHubUsername);
 
-  // Fetch real public repository data.
+  // Store recent commits from GitHub.
+  const [recentCommits, setRecentCommits] =
+    useState<GitHubCommit[]>([]);
+
+  // Track the commit-loading state.
+  const [activityLoading, setActivityLoading] = useState(false);
+
+  // Store errors from the GitHub activity request.
+  const [activityError, setActivityError] = useState("");
+
+  // Load the user's public GitHub repositories.
   const {
     repositories,
     loading,
     error,
   } = useGitHubRepositories(githubUsername);
 
+  // Load the signed-in user's display name.
   useEffect(() => {
-    // Load the signed-in user's name.
     async function loadUser() {
       const { data, error: userError } =
         await supabase.auth.getUser();
@@ -57,6 +72,67 @@ export default function DashboardPage() {
     void loadUser();
   }, []);
 
+  // Load commits when the repository data becomes available.
+  useEffect(() => {
+    // Do not request commits without a username or repository.
+    if (!githubUsername || loading || error) {
+      setRecentCommits([]);
+      setActivityError("");
+      setActivityLoading(false);
+      return;
+    }
+
+    const firstRepository = repositories[0];
+
+    if (!firstRepository) {
+      setRecentCommits([]);
+      setActivityError("");
+      setActivityLoading(false);
+      return;
+    }
+
+    // Cancel the request if the component changes or unmounts.
+    const controller = new AbortController();
+
+    async function loadRecentActivity() {
+      setActivityLoading(true);
+      setActivityError("");
+      setRecentCommits([]);
+
+      try {
+        const commits = await fetchRepositoryCommits(
+          githubUsername,
+          firstRepository.name,
+          controller.signal
+        );
+
+        if (!controller.signal.aborted) {
+          setRecentCommits(commits.slice(0, 5));
+        }
+      } catch (err) {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setActivityError(
+          err instanceof Error
+            ? err.message
+            : "Unable to load GitHub activity."
+        );
+      } finally {
+        if (!controller.signal.aborted) {
+          setActivityLoading(false);
+        }
+      }
+    }
+
+    void loadRecentActivity();
+
+    return () => {
+      controller.abort();
+    };
+  }, [githubUsername, repositories, loading, error]);
+
   // Sign out using Supabase Authentication.
   async function handleLogout() {
     setLogoutError("");
@@ -72,8 +148,7 @@ export default function DashboardPage() {
     navigate("/login", { replace: true });
   }
 
-  // Repository count comes from the real GitHub API.
-  // Other metrics remain unavailable until their APIs exist.
+  // Display real data only when it is available.
   const stats = [
     {
       label: "Public Repositories",
@@ -103,6 +178,21 @@ export default function DashboardPage() {
     },
   ];
 
+  // Format a GitHub commit date for display.
+  function formatCommitDate(date: string | undefined) {
+    if (!date) {
+      return "Date unavailable";
+    }
+
+    const parsedDate = new Date(date);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return "Date unavailable";
+    }
+
+    return parsedDate.toLocaleString();
+  }
+
   return (
     <div className="dashboard-layout">
       {/* Sidebar */}
@@ -128,11 +218,21 @@ export default function DashboardPage() {
             <span>Repositories</span>
           </Link>
 
-          {/* Navigate to the real CI/CD pipelines page */}
-<Link to="/pipelines" className="dashboard-nav-item">
-  <Workflow size={19} />
-  <span>Pipelines</span>
-</Link>
+          <Link
+            to="/pipelines"
+            className="dashboard-nav-item"
+          >
+            <Workflow size={19} />
+            <span>Pipelines</span>
+          </Link>
+
+          <Link
+            to="/activity"
+            className="dashboard-nav-item"
+          >
+            <Activity size={19} />
+            <span>Activity Audit</span>
+          </Link>
         </nav>
 
         <button
@@ -243,21 +343,87 @@ export default function DashboardPage() {
           </Link>
         </section>
 
-        {/* Recent activity */}
+        {/* Recent GitHub commit activity */}
         <section className="dashboard-panel">
-          <h2 className="dashboard-panel-title">
-            Recent activity
-          </h2>
+          <div className="dashboard-activity-heading">
+            <div>
+              <h2 className="dashboard-panel-title">
+                Recent activity
+              </h2>
 
-          <p className="dashboard-panel-text">
-            CI/CD activity monitoring will be available
-            after GitHub Actions integration.
-          </p>
+              <p className="dashboard-panel-text">
+                Latest commits from your first listed public repository.
+              </p>
+            </div>
 
-          <span className="dashboard-coming-soon">
-            <RefreshCw size={14} />
-            Coming soon
-          </span>
+            <RefreshCw
+              size={18}
+              className={activityLoading ? "activity-spinning" : ""}
+            />
+          </div>
+
+          {!githubUsername ? (
+            <p className="dashboard-panel-text">
+              Open Repositories and enter a GitHub username to view activity.
+            </p>
+          ) : loading || activityLoading ? (
+            <p className="dashboard-panel-text">
+              Loading recent GitHub commits...
+            </p>
+          ) : error ? (
+            <p className="dashboard-panel-text" role="alert">
+              {error}
+            </p>
+          ) : activityError ? (
+            <p className="dashboard-panel-text" role="alert">
+              {activityError}
+            </p>
+          ) : repositories.length === 0 ? (
+            <p className="dashboard-panel-text">
+              No public repositories were found for this username.
+            </p>
+          ) : recentCommits.length === 0 ? (
+            <p className="dashboard-panel-text">
+              No commits were found in the selected repository.
+            </p>
+          ) : (
+            <div className="dashboard-activity-list">
+              {recentCommits.map((commit) => (
+                <article
+                  className="dashboard-activity-item"
+                  key={commit.sha}
+                >
+                  <div className="dashboard-activity-icon">
+                    <GitBranch size={18} />
+                  </div>
+
+                  <div className="dashboard-activity-content">
+                    <p className="dashboard-activity-message">
+                      {commit.commit.message.split("\n")[0]}
+                    </p>
+
+                    <p className="dashboard-activity-meta">
+                      {commit.commit.author?.name ||
+                        commit.author?.login ||
+                        "Unknown author"}
+                      {" · "}
+                      {formatCommitDate(commit.commit.author?.date)}
+                    </p>
+
+                    <a
+                      className="dashboard-commit-link"
+                      href={commit.html_url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      View commit on GitHub
+                      <ArrowRight size={14} />
+                    </a>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </section>
       </main>
     </div>
