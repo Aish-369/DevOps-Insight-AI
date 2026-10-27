@@ -1,40 +1,51 @@
 
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import "../styles/DashboardPage.css";
 import {
   Activity,
+  ArrowRight,
   GitBranch,
   LayoutDashboard,
   LogOut,
+  RefreshCw,
   ShieldCheck,
   Workflow,
-  ArrowRight,
-  RefreshCw,
 } from "lucide-react";
 
 import { supabase } from "../lib/supabase";
-
-import {
-  getSavedGitHubUsername,
-  useGitHubRepositories,
-} from "../hooks/useGitHubRepositories";
-
+import { useGitHubRepositories } from "../hooks/useGitHubRepositories";
+import { useGitHubUsername } from "../hooks/useGitHubUsername";
 import {
   fetchRepositoryCommits,
   type GitHubCommit,
 } from "../lib/githubActivity";
 
-
+import "../styles/DashboardPage.css";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
 
+  // Store the signed-in user's display name.
   const [userName, setUserName] = useState("Developer");
+
+  // Store logout errors.
   const [logoutError, setLogoutError] = useState("");
 
-  // Read the saved GitHub username.
-  const [githubUsername] = useState(getSavedGitHubUsername);
+  // Load the GitHub username from the signed-in user's Supabase profile.
+  const {
+    username: githubUsername,
+    loading: usernameLoading,
+    error: usernameError,
+  } = useGitHubUsername();
+
+  // Load public repositories for the saved GitHub username.
+  const {
+    repositories,
+    loading,
+    error,
+  } = useGitHubRepositories(
+    usernameLoading || usernameError ? "" : githubUsername
+  );
 
   // Store recent commits from GitHub.
   const [recentCommits, setRecentCommits] =
@@ -46,23 +57,20 @@ export default function DashboardPage() {
   // Store errors from the GitHub activity request.
   const [activityError, setActivityError] = useState("");
 
-  // Load the user's public GitHub repositories.
-  const {
-    repositories,
-    loading,
-    error,
-  } = useGitHubRepositories(githubUsername);
-
   // Load the signed-in user's display name.
   useEffect(() => {
+    let active = true;
+
     async function loadUser() {
       const { data, error: userError } =
         await supabase.auth.getUser();
 
-      if (userError || !data.user) {
+      // Stop if the request failed or there is no signed-in user.
+      if (userError || !data.user || !active) {
         return;
       }
 
+      // Prefer the full name, then use the email prefix.
       const fullName = data.user.user_metadata?.full_name;
       const emailName = data.user.email?.split("@")[0];
 
@@ -70,12 +78,25 @@ export default function DashboardPage() {
     }
 
     void loadUser();
+
+    // Prevent state updates after the component unmounts.
+    return () => {
+      active = false;
+    };
   }, []);
 
-  // Load commits when the repository data becomes available.
+  // Load recent commits after the repository data is available.
   useEffect(() => {
-    // Do not request commits without a username or repository.
-    if (!githubUsername || loading || error) {
+    // Wait until the saved username has finished loading.
+    if (usernameLoading) {
+      setRecentCommits([]);
+      setActivityError("");
+      setActivityLoading(false);
+      return;
+    }
+
+    // Do not request commits without a valid username or repository data.
+    if (!githubUsername || usernameError || loading || error) {
       setRecentCommits([]);
       setActivityError("");
       setActivityLoading(false);
@@ -84,6 +105,7 @@ export default function DashboardPage() {
 
     const firstRepository = repositories[0];
 
+    // Show an empty state when no public repositories exist.
     if (!firstRepository) {
       setRecentCommits([]);
       setActivityError("");
@@ -91,7 +113,7 @@ export default function DashboardPage() {
       return;
     }
 
-    // Cancel the request if the component changes or unmounts.
+    // Cancel the request if the username or repository changes.
     const controller = new AbortController();
 
     async function loadRecentActivity() {
@@ -100,16 +122,19 @@ export default function DashboardPage() {
       setRecentCommits([]);
 
       try {
+        // Fetch commits from the first listed public repository.
         const commits = await fetchRepositoryCommits(
           githubUsername,
           firstRepository.name,
           controller.signal
         );
 
+        // Update the page only if the request is still active.
         if (!controller.signal.aborted) {
           setRecentCommits(commits.slice(0, 5));
         }
       } catch (err) {
+        // Ignore errors from requests that were cancelled.
         if (controller.signal.aborted) {
           return;
         }
@@ -120,6 +145,7 @@ export default function DashboardPage() {
             : "Unable to load GitHub activity."
         );
       } finally {
+        // Stop the loading indicator if the request is still active.
         if (!controller.signal.aborted) {
           setActivityLoading(false);
         }
@@ -128,10 +154,18 @@ export default function DashboardPage() {
 
     void loadRecentActivity();
 
+    // Cancel the request when its dependencies change.
     return () => {
       controller.abort();
     };
-  }, [githubUsername, repositories, loading, error]);
+  }, [
+    githubUsername,
+    usernameLoading,
+    usernameError,
+    repositories,
+    loading,
+    error,
+  ]);
 
   // Sign out using Supabase Authentication.
   async function handleLogout() {
@@ -145,19 +179,23 @@ export default function DashboardPage() {
       return;
     }
 
+    // Return to the login page after signing out.
     navigate("/login", { replace: true });
   }
 
-  // Display real data only when it is available.
+  // Combine profile and repository errors for display.
+  const repositoryError = usernameError || error;
+
+  // Prepare the dashboard statistics.
   const stats = [
     {
       label: "Public Repositories",
-      value: !githubUsername
-        ? "—"
-        : loading
-          ? "..."
-          : error
-            ? "—"
+      value: usernameLoading
+        ? "..."
+        : repositoryError || !githubUsername
+          ? "—"
+          : loading
+            ? "..."
             : String(repositories.length),
       icon: GitBranch,
     },
@@ -303,33 +341,39 @@ export default function DashboardPage() {
             GitHub Repositories
           </h2>
 
-          {githubUsername ? (
+          {usernameLoading ? (
+            <p className="dashboard-panel-text">
+              Loading your saved GitHub username...
+            </p>
+          ) : usernameError ? (
+            <p className="dashboard-panel-text" role="alert">
+              {usernameError}
+            </p>
+          ) : !githubUsername ? (
+            <p className="dashboard-panel-text">
+              Open Repositories and enter a public GitHub username
+              to connect it to your profile.
+            </p>
+          ) : loading ? (
+            <p className="dashboard-panel-text">
+              Loading repository data for @{githubUsername}...
+            </p>
+          ) : error ? (
+            <p className="dashboard-panel-text" role="alert">
+              {error}
+            </p>
+          ) : (
             <>
               <p className="dashboard-panel-text">
                 Viewing public repositories for{" "}
                 <strong>@{githubUsername}</strong>.
               </p>
 
-              {loading ? (
-                <p className="dashboard-panel-text">
-                  Loading repository data...
-                </p>
-              ) : error ? (
-                <p className="dashboard-panel-text" role="alert">
-                  {error}
-                </p>
-              ) : (
-                <p className="dashboard-panel-text">
-                  {repositories.length} public repositories
-                  loaded from GitHub.
-                </p>
-              )}
+              <p className="dashboard-panel-text">
+                {repositories.length} public repositories loaded
+                from GitHub.
+              </p>
             </>
-          ) : (
-            <p className="dashboard-panel-text">
-              Explore GitHub repositories by entering
-              a public GitHub username.
-            </p>
           )}
 
           <Link
@@ -358,11 +402,21 @@ export default function DashboardPage() {
 
             <RefreshCw
               size={18}
-              className={activityLoading ? "activity-spinning" : ""}
+              className={
+                activityLoading ? "activity-spinning" : ""
+              }
             />
           </div>
 
-          {!githubUsername ? (
+          {usernameLoading ? (
+            <p className="dashboard-panel-text">
+              Loading your GitHub profile...
+            </p>
+          ) : usernameError ? (
+            <p className="dashboard-panel-text" role="alert">
+              {usernameError}
+            </p>
+          ) : !githubUsername ? (
             <p className="dashboard-panel-text">
               Open Repositories and enter a GitHub username to view activity.
             </p>

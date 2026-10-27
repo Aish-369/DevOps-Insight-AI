@@ -1,5 +1,11 @@
 
-import { useMemo, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from "react";
+
 import { Link } from "react-router-dom";
 
 import {
@@ -12,60 +18,79 @@ import {
 
 import RepositoryCard from "../components/github/RepositoryCard";
 
-import {
-  getSavedGitHubUsername,
-  saveGitHubUsername,
-  useGitHubRepositories,
-} from "../hooks/useGitHubRepositories";
+// Fetch public GitHub profile and repository data.
+import { useGitHubRepositories } from "../hooks/useGitHubRepositories";
+
+// Read and save the username in the signed-in user's Supabase profile.
+import { useGitHubUsername } from "../hooks/useGitHubUsername";
 
 // Import the page's CSS styles.
 import "../styles/RepositoriesPage.css";
 
 export default function RepositoriesPage() {
   // Store the username entered in the input field.
-  const [inputUsername, setInputUsername] = useState(
-    getSavedGitHubUsername
-  );
-
-  // Store the username used for GitHub API requests.
-  const [username, setUsername] = useState(
-    getSavedGitHubUsername
-  );
+  const [inputUsername, setInputUsername] = useState("");
 
   // Store search and language filter values.
   const [search, setSearch] = useState("");
   const [language, setLanguage] = useState("all");
 
-  // Get GitHub data from our custom React hook.
+  // Load the username belonging to the signed-in user.
+  const {
+    username,
+    loading: profileLoading,
+    saving,
+    error: profileError,
+    saveUsername,
+  } = useGitHubUsername();
+
+  // Do not fetch GitHub data before the profile loads.
+  const activeUsername = profileLoading ? "" : username;
+
+  // Fetch public repositories for the saved username.
   const {
     profile,
     repositories,
     loading,
     error,
     refresh,
-  } = useGitHubRepositories(username);
+  } = useGitHubRepositories(activeUsername);
 
-  // Run when the user submits the GitHub username.
-  function handleConnect(event: FormEvent<HTMLFormElement>) {
+  // Show the saved username after the profile finishes loading.
+  useEffect(() => {
+    if (!profileLoading) {
+      setInputUsername(username);
+    }
+  }, [profileLoading, username]);
+
+  // Save the entered username to the current user's profile.
+  async function handleConnect(
+    event: FormEvent<HTMLFormElement>
+  ) {
+    // Prevent the browser from reloading the page.
     event.preventDefault();
 
+    // Remove extra spaces from the username.
     const cleanUsername = inputUsername.trim();
 
-    if (!cleanUsername) {
+    // Stop if the username is empty.
+    if (!cleanUsername || profileLoading || saving) {
       return;
     }
 
-    // Save the username for future visits.
-    saveGitHubUsername(cleanUsername);
+    // Save the username to Supabase.
+    const saved = await saveUsername(cleanUsername);
 
-    // Update the username used by the API hook.
-    setUsername(cleanUsername);
+    // Stop if the database update fails.
+    if (!saved) {
+      return;
+    }
 
-    // Reset the search and filter.
+    // Reset search and language filters.
     setSearch("");
     setLanguage("all");
 
-    // Reload data if the same username is submitted again.
+    // Refresh when the saved username has not changed.
     if (cleanUsername === username) {
       refresh();
     }
@@ -87,12 +112,14 @@ export default function RepositoriesPage() {
     return repositories.filter((repository) => {
       const query = search.toLowerCase().trim();
 
+      // Match repository name or description.
       const matchesSearch =
         repository.name.toLowerCase().includes(query) ||
         (repository.description || "")
           .toLowerCase()
           .includes(query);
 
+      // Match the selected programming language.
       const matchesLanguage =
         language === "all" ||
         repository.language === language;
@@ -100,6 +127,12 @@ export default function RepositoriesPage() {
       return matchesSearch && matchesLanguage;
     });
   }, [repositories, search, language]);
+
+  // Combine API and profile errors.
+  const displayError = profileError || error;
+
+  // Track loading for the current profile and GitHub data.
+  const isLoading = profileLoading || loading;
 
   return (
     <main className="repositories-page">
@@ -164,18 +197,33 @@ export default function RepositoriesPage() {
               onChange={(event) =>
                 setInputUsername(event.target.value)
               }
+              disabled={profileLoading || saving}
               required
               pattern="[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?"
               title="Enter a valid GitHub username."
             />
 
-            {/* Submit button */}
-            <button type="submit" disabled={loading}>
-              <GitBranch size={18} />
+            {/* Save username and load repositories */}
+            <button
+              type="submit"
+              disabled={isLoading || saving}
+            >
+              {isLoading || saving ? (
+                <RefreshCw
+                  size={18}
+                  className="repo-spin"
+                />
+              ) : (
+                <GitBranch size={18} />
+              )}
 
-              {loading
-                ? "Loading..."
-                : "Load repositories"}
+              {saving
+                ? "Saving..."
+                : profileLoading
+                  ? "Loading profile..."
+                  : loading
+                    ? "Loading..."
+                    : "Load repositories"}
             </button>
           </form>
 
@@ -184,19 +232,19 @@ export default function RepositoriesPage() {
           </p>
         </section>
 
-        {/* API error message */}
-        {error && (
+        {/* Show database or GitHub API errors */}
+        {displayError && (
           <div
             className="repositories-error"
             role="alert"
           >
             <AlertCircle size={20} />
-            <span>{error}</span>
+            <span>{displayError}</span>
           </div>
         )}
 
         {/* Loading state */}
-        {loading && (
+        {isLoading && (
           <div
             className="repositories-status"
             role="status"
@@ -206,12 +254,16 @@ export default function RepositoriesPage() {
               className="repo-spin"
             />
 
-            <p>Fetching repositories from GitHub...</p>
+            <p>
+              {profileLoading
+                ? "Loading your profile..."
+                : "Fetching repositories from GitHub..."}
+            </p>
           </div>
         )}
 
         {/* Display GitHub profile and repositories */}
-        {!loading && !error && profile && (
+        {!isLoading && !displayError && profile && (
           <>
             <section className="repositories-profile">
               <img
@@ -229,7 +281,7 @@ export default function RepositoriesPage() {
                 </span>
               </div>
 
-              {/* Refresh API data */}
+              {/* Refresh GitHub API data */}
               <button
                 className="repositories-refresh"
                 type="button"
@@ -309,7 +361,7 @@ export default function RepositoriesPage() {
         )}
 
         {/* Initial empty state */}
-        {!loading && !error && !profile && (
+        {!isLoading && !displayError && !profile && (
           <div className="repositories-status">
             <GitBranch size={32} />
 
