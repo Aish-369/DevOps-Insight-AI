@@ -1,6 +1,5 @@
 
 import {
-  useEffect,
   useMemo,
   useState,
   type FormEvent,
@@ -18,18 +17,17 @@ import {
 
 import RepositoryCard from "../components/github/RepositoryCard";
 
-// Fetch public GitHub profile and repository data.
 import { useGitHubRepositories } from "../hooks/useGitHubRepositories";
-
-// Read and save the username in the signed-in user's Supabase profile.
 import { useGitHubUsername } from "../hooks/useGitHubUsername";
 
-// Import the page's CSS styles.
 import "../styles/RepositoriesPage.css";
 
 export default function RepositoriesPage() {
-  // Store the username entered in the input field.
-  const [inputUsername, setInputUsername] = useState("");
+  // Store the user's edited username separately from the saved username.
+  const [inputDraft, setInputDraft] = useState<{
+    username: string;
+    value: string;
+  } | null>(null);
 
   // Store search and language filter values.
   const [search, setSearch] = useState("");
@@ -44,6 +42,15 @@ export default function RepositoriesPage() {
     saveUsername,
   } = useGitHubUsername();
 
+  // Show the saved username unless the user has edited the input.
+  // Ignore an old draft when the saved username changes.
+  const inputUsername =
+    inputDraft?.username === username
+      ? inputDraft.value
+      : profileLoading
+        ? ""
+        : username;
+
   // Do not fetch GitHub data before the profile loads.
   const activeUsername = profileLoading ? "" : username;
 
@@ -55,13 +62,6 @@ export default function RepositoriesPage() {
     error,
     refresh,
   } = useGitHubRepositories(activeUsername);
-
-  // Show the saved username after the profile finishes loading.
-  useEffect(() => {
-    if (!profileLoading) {
-      setInputUsername(username);
-    }
-  }, [profileLoading, username]);
 
   // Save the entered username to the current user's profile.
   async function handleConnect(
@@ -85,6 +85,9 @@ export default function RepositoriesPage() {
     if (!saved) {
       return;
     }
+
+    // Reset the input draft after saving.
+    setInputDraft(null);
 
     // Reset search and language filters.
     setSearch("");
@@ -195,7 +198,10 @@ export default function RepositoriesPage() {
               placeholder="Enter GitHub username"
               value={inputUsername}
               onChange={(event) =>
-                setInputUsername(event.target.value)
+                setInputDraft({
+                  username,
+                  value: event.target.value,
+                })
               }
               disabled={profileLoading || saving}
               required

@@ -90,27 +90,18 @@ export default function DashboardPage() {
   useEffect(() => {
     // Wait until the saved username has finished loading.
     if (usernameLoading) {
-      setRecentCommits([]);
-      setActivityError("");
-      setActivityLoading(false);
       return;
     }
 
-    // Do not request commits without a valid username or repository data.
+    // Do not request commits without valid GitHub data.
     if (!githubUsername || usernameError || loading || error) {
-      setRecentCommits([]);
-      setActivityError("");
-      setActivityLoading(false);
       return;
     }
 
     const firstRepository = repositories[0];
 
-    // Show an empty state when no public repositories exist.
+    // Stop when no public repositories exist.
     if (!firstRepository) {
-      setRecentCommits([]);
-      setActivityError("");
-      setActivityLoading(false);
       return;
     }
 
@@ -118,6 +109,7 @@ export default function DashboardPage() {
     const controller = new AbortController();
 
     async function loadRecentActivity() {
+      // Update activity state when a valid request starts.
       setActivityLoading(true);
       setActivityError("");
       setRecentCommits([]);
@@ -429,21 +421,25 @@ export default function DashboardPage() {
             <p className="dashboard-panel-text">
               Open Repositories and enter a GitHub username to view activity.
             </p>
-          ) : loading || activityLoading ? (
+          ) : loading ? (
             <p className="dashboard-panel-text">
-              Loading recent GitHub commits...
+              Loading repository data...
             </p>
           ) : error ? (
             <p className="dashboard-panel-text" role="alert">
               {error}
             </p>
-          ) : activityError ? (
-            <p className="dashboard-panel-text" role="alert">
-              {activityError}
-            </p>
           ) : repositories.length === 0 ? (
             <p className="dashboard-panel-text">
               No public repositories were found for this username.
+            </p>
+          ) : activityLoading ? (
+            <p className="dashboard-panel-text">
+              Loading recent GitHub commits...
+            </p>
+          ) : activityError ? (
+            <p className="dashboard-panel-text" role="alert">
+              {activityError}
             </p>
           ) : recentCommits.length === 0 ? (
             <p className="dashboard-panel-text">
