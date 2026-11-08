@@ -1,5 +1,4 @@
-
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Activity,
@@ -21,6 +20,13 @@ import {
 } from "../lib/githubActivity";
 
 import "../styles/DashboardPage.css";
+
+// Store commit results with the repository request key.
+type ActivityResult = {
+  requestKey: string;
+  commits: GitHubCommit[];
+  error: string;
+};
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -47,15 +53,9 @@ export default function DashboardPage() {
     usernameLoading || usernameError ? "" : githubUsername
   );
 
-  // Store recent commits from GitHub.
-  const [recentCommits, setRecentCommits] =
-    useState<GitHubCommit[]>([]);
-
-  // Track the commit-loading state.
-  const [activityLoading, setActivityLoading] = useState(false);
-
-  // Store errors from the GitHub activity request.
-  const [activityError, setActivityError] = useState("");
+  // Store the latest recent activity request result.
+  const [activityResult, setActivityResult] =
+    useState<ActivityResult | null>(null);
 
   // Load the signed-in user's display name.
   useEffect(() => {
@@ -85,53 +85,76 @@ export default function DashboardPage() {
     };
   }, []);
 
+  // Get the first available public repository.
+  const firstRepository = repositories[0];
+
+  // Identify the current GitHub activity request.
+  const firstRepositoryFullName =
+    firstRepository?.full_name ?? "";
+
+  const activityRequestKey = JSON.stringify([
+    githubUsername,
+    firstRepositoryFullName,
+  ]);
+
+  // Only display results belonging to the current request.
+  const currentActivityResult =
+    activityResult?.requestKey === activityRequestKey
+      ? activityResult
+      : null;
+
+  // Derive recent commits and errors from the current result.
+  const recentCommits = currentActivityResult?.commits ?? [];
+  const activityError = currentActivityResult?.error ?? "";
+
+  // Combine profile and repository errors.
+  const repositoryError = usernameError || error;
+
+  // Show loading while the current activity request has no result.
+  const activityLoading =
+    !usernameLoading &&
+    !usernameError &&
+    Boolean(githubUsername) &&
+    !loading &&
+    !error &&
+    Boolean(firstRepositoryFullName) &&
+    !currentActivityResult;
+
   // Load recent commits after the repository data is available.
   useEffect(() => {
-    // Wait until the saved username has finished loading.
-    if (usernameLoading) {
-      setRecentCommits([]);
-      setActivityError("");
-      setActivityLoading(false);
-      return;
-    }
+    // Wait until the saved username and repositories have loaded.
+    if (usernameLoading || loading) return;
 
     // Do not request commits without a valid username or repository data.
-    if (!githubUsername || usernameError || loading || error) {
-      setRecentCommits([]);
-      setActivityError("");
-      setActivityLoading(false);
-      return;
-    }
-
-    const firstRepository = repositories[0];
+    if (!githubUsername || usernameError || error) return;
 
     // Show an empty state when no public repositories exist.
-    if (!firstRepository) {
-      setRecentCommits([]);
-      setActivityError("");
-      setActivityLoading(false);
-      return;
-    }
+    if (!firstRepositoryFullName) return;
+
+    // Read the owner and repository from the full repository name.
+    const [owner, repo] = firstRepositoryFullName.split("/");
+
+    if (!owner || !repo) return;
 
     // Cancel the request if the username or repository changes.
     const controller = new AbortController();
 
     async function loadRecentActivity() {
-      setActivityLoading(true);
-      setActivityError("");
-      setRecentCommits([]);
-
       try {
         // Fetch commits from the first listed public repository.
         const commits = await fetchRepositoryCommits(
-          githubUsername,
-          firstRepository.name,
+          owner,
+          repo,
           controller.signal
         );
 
         // Update the page only if the request is still active.
         if (!controller.signal.aborted) {
-          setRecentCommits(commits.slice(0, 5));
+          setActivityResult({
+            requestKey: activityRequestKey,
+            commits: commits.slice(0, 5),
+            error: "",
+          });
         }
       } catch (err) {
         // Ignore errors from requests that were cancelled.
@@ -139,16 +162,14 @@ export default function DashboardPage() {
           return;
         }
 
-        setActivityError(
-          err instanceof Error
-            ? err.message
-            : "Unable to load GitHub activity."
-        );
-      } finally {
-        // Stop the loading indicator if the request is still active.
-        if (!controller.signal.aborted) {
-          setActivityLoading(false);
-        }
+        setActivityResult({
+          requestKey: activityRequestKey,
+          commits: [],
+          error:
+            err instanceof Error
+              ? err.message
+              : "Unable to load GitHub activity.",
+        });
       }
     }
 
@@ -162,9 +183,10 @@ export default function DashboardPage() {
     githubUsername,
     usernameLoading,
     usernameError,
-    repositories,
+    firstRepositoryFullName,
     loading,
     error,
+    activityRequestKey,
   ]);
 
   // Sign out using Supabase Authentication.
@@ -182,9 +204,6 @@ export default function DashboardPage() {
     // Return to the login page after signing out.
     navigate("/login", { replace: true });
   }
-
-  // Combine profile and repository errors for display.
-  const repositoryError = usernameError || error;
 
   // Prepare the dashboard statistics.
   const stats = [

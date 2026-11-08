@@ -1,5 +1,4 @@
-
-import { useCallback, useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
 
 import { supabase } from "../lib/supabase";
 
@@ -10,34 +9,71 @@ export function useGitHubUsername() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // Load the username from the current user's profile.
-  const loadUsername = useCallback(async () => {
+  // Fetch the username without directly updating React state.
+  const fetchUsername = useCallback(async (): Promise<string> => {
+    // Get the currently signed-in Supabase user.
+    const { data: authData, error: authError } =
+      await supabase.auth.getUser();
+
+    if (authError) throw authError;
+
+    // Return an empty username if nobody is signed in.
+    if (!authData.user) {
+      return "";
+    }
+
+    // Read only this user's GitHub username.
+    const { data, error: profileError } = await supabase
+      .from("profiles")
+      .select("github_username")
+      .eq("id", authData.user.id)
+      .maybeSingle();
+
+    if (profileError) throw profileError;
+
+    return data?.github_username ?? "";
+  }, []);
+
+  // Load the username when the hook is first used.
+  useEffect(() => {
+    let active = true;
+
+    // Fetch data asynchronously and update state after completion.
+    fetchUsername()
+      .then((value) => {
+        if (active) {
+          setUsername(value);
+        }
+      })
+      .catch((err: unknown) => {
+        if (active) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Unable to load the GitHub username."
+          );
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+        }
+      });
+
+    // Ignore results after the component unmounts.
+    return () => {
+      active = false;
+    };
+  }, [fetchUsername]);
+
+  // Reload the username when requested by the UI.
+  const reloadUsername = useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
-      // Get the currently signed-in Supabase user.
-      const { data: authData, error: authError } =
-        await supabase.auth.getUser();
-
-      if (authError) throw authError;
-
-      // Clear the username if nobody is signed in.
-      if (!authData.user) {
-        setUsername("");
-        return;
-      }
-
-      // Read only this user's GitHub username.
-      const { data, error: profileError } = await supabase
-        .from("profiles")
-        .select("github_username")
-        .eq("id", authData.user.id)
-        .maybeSingle();
-
-      if (profileError) throw profileError;
-
-      setUsername(data?.github_username ?? "");
+      const value = await fetchUsername();
+      setUsername(value);
     } catch (err) {
       setError(
         err instanceof Error
@@ -47,12 +83,7 @@ export function useGitHubUsername() {
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  // Load the profile when the hook is first used.
-  useEffect(() => {
-    void loadUsername();
-  }, [loadUsername]);
+  }, [fetchUsername]);
 
   // Save the username to the signed-in user's profile.
   const saveUsername = useCallback(async (value: string) => {
@@ -107,6 +138,6 @@ export function useGitHubUsername() {
     saving,
     error,
     saveUsername,
-    reloadUsername: loadUsername,
+    reloadUsername,
   };
 }

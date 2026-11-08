@@ -1,5 +1,4 @@
-
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
     ArrowLeft,
@@ -21,6 +20,13 @@ import {
 } from "../lib/pipelines";
 
 import "../styles/PipelinesPage.css";
+
+// Store workflow results with their request key.
+type PipelineResult = {
+    requestKey: string;
+    runs: PipelineRun[];
+    error: string;
+};
 
 // Return the correct label and style for a workflow run.
 function getRunStatus(run: PipelineRun) {
@@ -66,50 +72,77 @@ export default function PipelinesPage() {
         usernameLoading || usernameError ? "" : username
     );
 
-    // Store the currently selected repository.
+    // Store the user's repository selection.
     const [selectedRepo, setSelectedRepo] = useState("");
-
-    // Store the workflow runs returned by GitHub.
-    const [runs, setRuns] = useState<PipelineRun[]>([]);
-
-    // Track workflow loading and error states.
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
 
     // Changing this value triggers a workflow refresh.
     const [refreshKey, setRefreshKey] = useState(0);
 
-    // Automatically select the first available repository.
-    useEffect(() => {
-        if (repositories.length === 0) {
-            setSelectedRepo("");
-            setRuns([]);
-            return;
-        }
+    // Store the latest workflow request result.
+    const [pipelineResult, setPipelineResult] =
+        useState<PipelineResult | null>(null);
 
-        // Keep the current selection if it still exists.
-        const selectedStillExists = repositories.some(
-            (repo) => repo.full_name === selectedRepo
-        );
+    // Keep the selected repository if it still exists.
+    const selectedRepositoryExists = repositories.some(
+        (repo) => repo.full_name === selectedRepo
+    );
 
-        // Otherwise select the first repository.
-        if (!selectedStillExists) {
-            setSelectedRepo(repositories[0].full_name);
-        }
-    }, [repositories, selectedRepo]);
+    // Automatically use the first repository when needed.
+    const activeSelectedRepo = selectedRepositoryExists
+        ? selectedRepo
+        : repositories[0]?.full_name ?? "";
+
+    // Identify the current workflow request.
+    const requestKey = JSON.stringify([
+        activeSelectedRepo,
+        refreshKey,
+    ]);
+
+    // Only use results belonging to the current request.
+    const currentPipelineResult =
+        pipelineResult?.requestKey === requestKey
+            ? pipelineResult
+            : null;
+
+    // Derive workflow runs and errors from the current result.
+    const runs = currentPipelineResult?.runs ?? [];
+    const error = currentPipelineResult?.error ?? "";
+
+    // Combine profile and repository loading states.
+    const profileLoading = usernameLoading || reposLoading;
+
+    // Combine profile and repository errors for display.
+    const profileError = usernameError || reposError;
+
+    // Determine whether workflow data is currently loading.
+    const loading =
+        !profileLoading &&
+        !profileError &&
+        Boolean(username) &&
+        Boolean(activeSelectedRepo) &&
+        !currentPipelineResult;
 
     // Fetch workflows when the selected repository changes.
     useEffect(() => {
-        // Do not fetch while the username or repositories are loading.
+        // Wait until the username and repositories have loaded.
         if (usernameLoading || reposLoading) {
             return;
         }
 
-        // Stop when the profile has an error or no repository is selected.
-        if (usernameError || reposError || !selectedRepo) {
-            setRuns([]);
-            setLoading(false);
-            setError(usernameError || reposError || "");
+        // Do not fetch when the profile has an error.
+        if (usernameError || reposError || !username) {
+            return;
+        }
+
+        // Stop when no repository is available.
+        if (!activeSelectedRepo) {
+            return;
+        }
+
+        // Split "owner/repository" into separate values.
+        const [owner, repo] = activeSelectedRepo.split("/");
+
+        if (!owner || !repo) {
             return;
         }
 
@@ -117,14 +150,7 @@ export default function PipelinesPage() {
         const controller = new AbortController();
 
         async function loadRuns() {
-            setLoading(true);
-            setError("");
-            setRuns([]);
-
             try {
-                // Split "owner/repository" into separate values.
-                const [owner, repo] = selectedRepo.split("/");
-
                 // Ask GitHub for the repository's workflow runs.
                 const result = await fetchPipelineRuns(
                     owner,
@@ -134,22 +160,26 @@ export default function PipelinesPage() {
 
                 // Ignore results from a cancelled request.
                 if (!controller.signal.aborted) {
-                    setRuns(result);
+                    setPipelineResult({
+                        requestKey,
+                        runs: result,
+                        error: "",
+                    });
                 }
             } catch (err) {
                 // Ignore errors from requests that were cancelled.
-                if (!controller.signal.aborted) {
-                    setError(
+                if (controller.signal.aborted) {
+                    return;
+                }
+
+                setPipelineResult({
+                    requestKey,
+                    runs: [],
+                    error:
                         err instanceof Error
                             ? err.message
-                            : "Unable to load pipeline runs."
-                    );
-                }
-            } finally {
-                // Update loading only for the active request.
-                if (!controller.signal.aborted) {
-                    setLoading(false);
-                }
+                            : "Unable to load pipeline runs.",
+                });
             }
         }
 
@@ -159,8 +189,9 @@ export default function PipelinesPage() {
         // Cancel the request if the selection changes or the page unmounts.
         return () => controller.abort();
     }, [
-        selectedRepo,
-        refreshKey,
+        activeSelectedRepo,
+        requestKey,
+        username,
         usernameLoading,
         usernameError,
         reposLoading,
@@ -186,12 +217,6 @@ export default function PipelinesPage() {
     const cancelled = runs.filter(
         (run) => run.conclusion === "cancelled"
     ).length;
-
-    // Wait until the user's GitHub profile has loaded.
-    const profileLoading = usernameLoading || reposLoading;
-
-    // Combine profile and repository errors for display.
-    const profileError = usernameError || reposError;
 
     return (
         <main className="pipelines-page">
@@ -232,7 +257,7 @@ export default function PipelinesPage() {
                         <div className="pipelines-controls">
                             <select
                                 aria-label="Select repository"
-                                value={selectedRepo}
+                                value={activeSelectedRepo}
                                 disabled={
                                     profileLoading ||
                                     repositories.length === 0
@@ -263,7 +288,7 @@ export default function PipelinesPage() {
                                     setRefreshKey((value) => value + 1)
                                 }
                                 disabled={
-                                    !selectedRepo ||
+                                    !activeSelectedRepo ||
                                     loading ||
                                     profileLoading
                                 }
@@ -369,7 +394,7 @@ export default function PipelinesPage() {
 
                             {!loading &&
                                 !error &&
-                                !selectedRepo &&
+                                !activeSelectedRepo &&
                                 repositories.length === 0 && (
                                     <div className="pipelines-empty">
                                         <GitBranch size={30} />
@@ -386,7 +411,7 @@ export default function PipelinesPage() {
 
                             {!loading &&
                                 !error &&
-                                selectedRepo &&
+                                activeSelectedRepo &&
                                 runs.length === 0 && (
                                     <div className="pipelines-empty">
                                         <Workflow size={30} />
