@@ -1,5 +1,4 @@
-
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 
 import {
   fetchGitHubProfile,
@@ -8,34 +7,33 @@ import {
   type GitHubRepository,
 } from "../lib/github";
 
+// Store the result of a GitHub API request.
+type GitHubResult = {
+  requestKey: string;
+  profile: GitHubProfile | null;
+  repositories: GitHubRepository[];
+  error: string;
+};
+
 // This hook fetches public GitHub data.
 // It does not save usernames or use localStorage.
 export function useGitHubRepositories(username: string) {
-  // Store the GitHub user profile.
-  const [profile, setProfile] = useState<GitHubProfile | null>(null);
-
-  // Store the fetched public repositories.
-  const [repositories, setRepositories] =
-    useState<GitHubRepository[]>([]);
-
-  // Track API loading and error states.
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  // Trigger a new request when the user clicks Refresh.
+  // Track manual refresh requests.
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Store the latest completed API request.
+  const [result, setResult] = useState<GitHubResult | null>(null);
+
+  // Remove extra spaces from the username.
+  const cleanUsername = username.trim();
+
+  // Identify each request using username and refresh count.
+  const requestKey = `${cleanUsername}:${refreshKey}`;
 
   // Fetch data when the username or refresh key changes.
   useEffect(() => {
-    // Remove extra spaces from the username.
-    const cleanUsername = username.trim();
-
-    // Clear old data when no username is available.
+    // Do not make an API request without a username.
     if (!cleanUsername) {
-      setProfile(null);
-      setRepositories([]);
-      setError("");
-      setLoading(false);
       return;
     }
 
@@ -43,48 +41,41 @@ export function useGitHubRepositories(username: string) {
     const controller = new AbortController();
 
     async function loadRepositories() {
-      // Start loading and clear previous results.
-      setLoading(true);
-      setError("");
-      setProfile(null);
-      setRepositories([]);
-
       try {
         // Fetch the profile and repositories together.
-        const [userProfile, userRepositories] =
-          await Promise.all([
-            fetchGitHubProfile(
-              cleanUsername,
-              controller.signal
-            ),
-            fetchGitHubRepositories(
-              cleanUsername,
-              controller.signal
-            ),
-          ]);
+        const [userProfile, userRepositories] = await Promise.all([
+          fetchGitHubProfile(cleanUsername, controller.signal),
+          fetchGitHubRepositories(cleanUsername, controller.signal),
+        ]);
 
-        // Update state only if the request is still active.
-        if (!controller.signal.aborted) {
-          setProfile(userProfile);
-          setRepositories(userRepositories);
+        // Ignore results from cancelled requests.
+        if (controller.signal.aborted) {
+          return;
         }
+
+        // Save the completed API response.
+        setResult({
+          requestKey,
+          profile: userProfile,
+          repositories: userRepositories,
+          error: "",
+        });
       } catch (err) {
         // Ignore errors caused by cancelled requests.
         if (controller.signal.aborted) {
           return;
         }
 
-        // Show a useful error message.
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Unable to load GitHub repositories."
-        );
-      } finally {
-        // Stop loading only for the active request.
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
+        // Save the API error.
+        setResult({
+          requestKey,
+          profile: null,
+          repositories: [],
+          error:
+            err instanceof Error
+              ? err.message
+              : "Unable to load GitHub repositories.",
+        });
       }
     }
 
@@ -95,7 +86,17 @@ export function useGitHubRepositories(username: string) {
     return () => {
       controller.abort();
     };
-  }, [username, refreshKey]);
+  }, [cleanUsername, requestKey]);
+
+  // Use only results belonging to the current request.
+  const currentResult =
+    result?.requestKey === requestKey ? result : null;
+
+  // Derive loading and data from the current request.
+  const loading = Boolean(cleanUsername) && !currentResult;
+  const profile = currentResult?.profile ?? null;
+  const repositories = currentResult?.repositories ?? [];
+  const error = currentResult?.error ?? "";
 
   // Allow the user to manually reload GitHub data.
   function refresh() {

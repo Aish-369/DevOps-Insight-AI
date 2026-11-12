@@ -1,0 +1,305 @@
+
+/* Main page */
+.pipelines-page {
+  min-height: 100vh;
+  padding: 42px 24px 80px;
+  background: #f7f8fc;
+  color: #24283e;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.pipelines-page * {
+  box-sizing: border-box;
+}
+
+.pipelines-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.pipelines-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 30px;
+  color: #7064cc;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.pipelines-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.pipelines-eyebrow {
+  color: #8377d9;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+}
+
+.pipelines-header h1 {
+  margin: 12px 0;
+  font-size: clamp(26px, 4vw, 36px);
+}
+
+.pipelines-header p,
+.pipelines-toolbar p,
+.pipelines-subtitle {
+  color: #9298aa;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.pipelines-header-icon,
+.pipelines-run-icon {
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: #eeebff;
+  color: #7061d1;
+}
+
+.pipelines-header-icon {
+  width: 62px;
+  height: 62px;
+}
+
+.pipelines-panel,
+.pipelines-stat {
+  padding: 26px;
+  border: 1px solid #e9ebf3;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(30, 35, 80, 0.035);
+}
+
+.pipelines-panel {
+  margin-bottom: 24px;
+}
+
+.pipelines-panel h2 {
+  margin: 0 0 8px;
+  font-size: 19px;
+}
+
+.pipelines-toolbar,
+.pipelines-controls,
+.pipelines-run,
+.pipelines-run-main,
+.pipelines-run-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.pipelines-toolbar,
+.pipelines-run {
+  justify-content: space-between;
+}
+
+.pipelines-controls select {
+  min-width: 220px;
+  padding: 13px 15px;
+  border: 1px solid #e4e6f0;
+  border-radius: 12px;
+  background: #fafbff;
+  color: #292d43;
+}
+
+.pipelines-controls button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 18px;
+  border: 0;
+  border-radius: 12px;
+  background: #7061d1;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pipelines-controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pipelines-stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.pipelines-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: #7061d1;
+}
+
+.pipelines-stat span {
+  color: #9197a8;
+  font-size: 13px;
+}
+
+.pipelines-stat strong {
+  color: #252940;
+  font-size: 30px;
+}
+
+.pipelines-subtitle {
+  margin-bottom: 22px;
+}
+
+.pipelines-run {
+  padding: 20px 0;
+  border-top: 1px solid #eff0f5;
+}
+
+.pipelines-run-main {
+  min-width: 0;
+}
+
+.pipelines-run-icon {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+.pipelines-run h3 {
+  margin: 0 0 7px;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.pipelines-run p {
+  margin: 0 0 7px;
+  color: #8d93a5;
+  font-size: 13px;
+}
+
+.pipelines-run small {
+  color: #a0a5b4;
+}
+
+.pipelines-run-actions a {
+  color: #7061d1;
+}
+
+.pipelines-status {
+  padding: 8px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.pipelines-status.success {
+  background: #e8f8ee;
+  color: #24865b;
+}
+
+.pipelines-status.failed {
+  background: #fff0f2;
+  color: #c84661;
+}
+
+.pipelines-status.running {
+  background: #fff6df;
+  color: #aa791b;
+}
+
+.pipelines-status.neutral {
+  background: #f0f1f5;
+  color: #6d7485;
+}
+
+.pipelines-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 45px 15px;
+  color: #8172d7;
+  text-align: center;
+}
+
+.pipelines-empty h3 {
+  margin: 0;
+  color: #292d43;
+}
+
+.pipelines-empty p {
+  color: #969cad;
+  font-size: 14px;
+}
+
+.pipelines-empty a {
+  color: #7061d1;
+  font-weight: 700;
+}
+
+.pipelines-error {
+  padding: 18px;
+  border-radius: 12px;
+  background: #fff0f2;
+  color: #c84661;
+}
+
+.pipelines-spin {
+  animation: pipelines-spin 1s linear infinite;
+}
+
+@keyframes pipelines-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 900px) {
+  .pipelines-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 650px) {
+  .pipelines-page {
+    padding: 25px 15px 60px;
+  }
+
+  .pipelines-header-icon {
+    display: none;
+  }
+
+  .pipelines-toolbar,
+  .pipelines-controls,
+  .pipelines-run {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pipelines-controls select,
+  .pipelines-controls button {
+    width: 100%;
+  }
+
+  .pipelines-stats {
+    gap: 10px;
+  }
+
+  .pipelines-stat {
+    padding: 18px;
+  }
+
+  .pipelines-run-actions {
+    justify-content: space-between;
+  }
+}

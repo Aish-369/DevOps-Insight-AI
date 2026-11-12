@@ -1,5 +1,4 @@
-
-import { useEffect, useState, type FormEvent } from "react";
+﻿import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import {
   Activity,
@@ -25,9 +24,17 @@ import {
 
 import "../styles/ActivityAuditPage.css";
 
+// Store the result of a commit request with its request key.
+type CommitResult = {
+  requestKey: string;
+  commits: GitHubCommit[];
+  error: string;
+};
+
 export default function ActivityAuditPage() {
   // Store the username entered into the form.
   const [usernameInput, setUsernameInput] = useState("");
+  const [usernameEdited, setUsernameEdited] = useState(false);
 
   // Load the signed-in user's GitHub username from Supabase.
   const {
@@ -36,11 +43,6 @@ export default function ActivityAuditPage() {
     error: usernameError,
     saveUsername,
   } = useGitHubUsername();
-
-  // Fill the input when the saved username becomes available.
-  useEffect(() => {
-    setUsernameInput(username);
-  }, [username]);
 
   // Load repositories belonging to the saved GitHub username.
   const {
@@ -54,36 +56,57 @@ export default function ActivityAuditPage() {
   // Store the currently selected repository.
   const [selectedRepo, setSelectedRepo] = useState("");
 
-  // Store recent commits.
-  const [commits, setCommits] = useState<GitHubCommit[]>([]);
-
   // Store the currently expanded commit details.
   const [selectedCommit, setSelectedCommit] =
     useState<GitHubCommitDetail | null>(null);
 
-  // Track commit loading, details loading, and errors.
-  const [loading, setLoading] = useState(false);
+  // Track commit details loading and errors.
   const [detailsLoading, setDetailsLoading] = useState(false);
-  const [error, setError] = useState("");
   const [detailsError, setDetailsError] = useState("");
+
+  // Store form validation or username-saving errors.
+  const [error, setError] = useState("");
+
+  // Store the latest commit request result.
+  const [commitResult, setCommitResult] =
+    useState<CommitResult | null>(null);
 
   // Increment this value to refresh the commit list.
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Automatically select a valid repository.
-  useEffect(() => {
-    if (reposLoading || reposError) return;
+  // Keep the selected repository if it still exists.
+  // Otherwise, use the first available repository.
+  const activeSelectedRepo = repositories.some(
+    (repo) => repo.full_name === selectedRepo
+  )
+    ? selectedRepo
+    : repositories[0]?.full_name ?? "";
 
-    setSelectedRepo((previous) => {
-      // Keep the current repository if it is still available.
-      if (repositories.some((repo) => repo.full_name === previous)) {
-        return previous;
-      }
+  // Identify the current repository and refresh request.
+  const commitRequestKey = `${activeSelectedRepo}:${refreshKey}`;
 
-      // Otherwise select the first available repository.
-      return repositories[0]?.full_name || "";
-    });
-  }, [repositories, reposLoading, reposError]);
+  // Only display commit data belonging to the current request.
+  const currentCommitResult =
+    commitResult?.requestKey === commitRequestKey
+      ? commitResult
+      : null;
+
+  // Derive commits and errors from the current request result.
+  const commits = currentCommitResult?.commits ?? [];
+  const commitError = currentCommitResult?.error ?? "";
+
+  // Combine profile and repository loading states.
+  const profileLoading = usernameLoading || reposLoading;
+
+  // Display the first available profile or repository error.
+  const profileError = usernameError || reposError;
+
+  // Show loading while the current commit request has no result.
+  const loading =
+    !profileLoading &&
+    !profileError &&
+    Boolean(activeSelectedRepo) &&
+    !currentCommitResult;
 
   // Load recent commits for the selected repository.
   useEffect(() => {
@@ -91,36 +114,18 @@ export default function ActivityAuditPage() {
     if (usernameLoading || reposLoading) return;
 
     // Do not fetch commits when profile or repository loading failed.
-    if (usernameError || reposError) {
-      setCommits([]);
-      setSelectedCommit(null);
-      setLoading(false);
-      setError("");
-      return;
-    }
+    if (usernameError || reposError) return;
 
-    // Clear the commit list when no repository is selected.
-    if (!selectedRepo) {
-      setCommits([]);
-      setSelectedCommit(null);
-      setError("");
-      setLoading(false);
-      return;
-    }
+    // Do not fetch commits when no repository is selected.
+    if (!activeSelectedRepo) return;
 
     // Allow outdated requests to be cancelled.
     const controller = new AbortController();
 
     async function loadCommits() {
-      setLoading(true);
-      setError("");
-      setCommits([]);
-      setSelectedCommit(null);
-      setDetailsError("");
-
       try {
         // Split the repository name into owner and repository.
-        const [owner, repo] = selectedRepo.split("/");
+        const [owner, repo] = activeSelectedRepo.split("/");
 
         if (!owner || !repo) {
           throw new Error("Invalid repository selection.");
@@ -135,32 +140,34 @@ export default function ActivityAuditPage() {
 
         // Ignore results from a cancelled request.
         if (!controller.signal.aborted) {
-          setCommits(result);
+          setCommitResult({
+            requestKey: commitRequestKey,
+            commits: result,
+            error: "",
+          });
         }
       } catch (err) {
         // Ignore errors from requests that were cancelled.
         if (!controller.signal.aborted) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Unable to load commit activity."
-          );
-        }
-      } finally {
-        // Finish loading only for the active request.
-        if (!controller.signal.aborted) {
-          setLoading(false);
+          setCommitResult({
+            requestKey: commitRequestKey,
+            commits: [],
+            error:
+              err instanceof Error
+                ? err.message
+                : "Unable to load commit activity.",
+          });
         }
       }
     }
 
     void loadCommits();
 
-    // Cancel the request if the repository changes.
+    // Cancel the request if the repository or refresh key changes.
     return () => controller.abort();
   }, [
-    selectedRepo,
-    refreshKey,
+    activeSelectedRepo,
+    commitRequestKey,
     usernameLoading,
     usernameError,
     reposLoading,
@@ -181,6 +188,8 @@ export default function ActivityAuditPage() {
 
     setError("");
     setDetailsError("");
+    setSelectedCommit(null);
+    setSelectedRepo("");
 
     // Save the username through Supabase.
     const saved = await saveUsername(cleanUsername);
@@ -188,10 +197,8 @@ export default function ActivityAuditPage() {
     // Do not continue if saving failed.
     if (!saved) return;
 
-    // Reset the old repository and commit selection.
-    setSelectedRepo("");
-    setCommits([]);
-    setSelectedCommit(null);
+    // Use the saved username from the profile again.
+    setUsernameEdited(false);
 
     // Reload repositories and commits using the saved username.
     setRefreshKey((previous) => previous + 1);
@@ -199,6 +206,8 @@ export default function ActivityAuditPage() {
 
   // Refresh the currently selected repository's commits.
   function handleRefresh() {
+    setSelectedCommit(null);
+    setDetailsError("");
     setRefreshKey((previous) => previous + 1);
   }
 
@@ -212,7 +221,7 @@ export default function ActivityAuditPage() {
     }
 
     // Read the owner and repository from the current selection.
-    const [owner, repo] = selectedRepo.split("/");
+    const [owner, repo] = activeSelectedRepo.split("/");
 
     if (!owner || !repo) return;
 
@@ -240,11 +249,13 @@ export default function ActivityAuditPage() {
     }
   }
 
-  // Combine profile and repository loading states.
-  const profileLoading = usernameLoading || reposLoading;
+  // Show the saved username until the user edits the input.
+  const displayedUsername = usernameEdited
+    ? usernameInput
+    : username;
 
-  // Display the first available profile or repository error.
-  const profileError = usernameError || reposError;
+  // Combine form and commit request errors.
+  const displayedError = error || commitError;
 
   return (
     <main className="audit-page">
@@ -281,10 +292,11 @@ export default function ActivityAuditPage() {
             <div className="audit-search-row">
               <input
                 id="audit-username"
-                value={usernameInput}
-                onChange={(event) =>
-                  setUsernameInput(event.target.value)
-                }
+                value={displayedUsername}
+                onChange={(event) => {
+                  setUsernameInput(event.target.value);
+                  setUsernameEdited(true);
+                }}
                 placeholder="Enter GitHub username"
                 required
               />
@@ -304,10 +316,12 @@ export default function ActivityAuditPage() {
 
           <select
             id="audit-repository"
-            value={selectedRepo}
-            onChange={(event) =>
-              setSelectedRepo(event.target.value)
-            }
+            value={activeSelectedRepo}
+            onChange={(event) => {
+              setSelectedRepo(event.target.value);
+              setSelectedCommit(null);
+              setDetailsError("");
+            }}
             disabled={profileLoading || repositories.length === 0}
           >
             <option value="">Select a repository</option>
@@ -330,14 +344,14 @@ export default function ActivityAuditPage() {
           <div className="audit-section-heading">
             <div>
               <h2>Recent commits</h2>
-              <p>{selectedRepo || "No repository selected"}</p>
+              <p>{activeSelectedRepo || "No repository selected"}</p>
             </div>
 
             <button
               type="button"
               className="audit-refresh"
               onClick={handleRefresh}
-              disabled={!selectedRepo || loading}
+              disabled={!activeSelectedRepo || loading}
             >
               <RefreshCw size={16} />
               Refresh
@@ -350,9 +364,9 @@ export default function ActivityAuditPage() {
             </p>
           )}
 
-          {error && (
+          {displayedError && (
             <p className="audit-error" role="alert">
-              {error}
+              {displayedError}
             </p>
           )}
 
@@ -371,8 +385,8 @@ export default function ActivityAuditPage() {
           {!profileLoading &&
             !loading &&
             !profileError &&
-            !error &&
-            !selectedRepo && (
+            !displayedError &&
+            !activeSelectedRepo && (
               <p className="audit-status">
                 Save your GitHub username and choose a repository
                 to view its commit history.
@@ -382,15 +396,15 @@ export default function ActivityAuditPage() {
           {!profileLoading &&
             !loading &&
             !profileError &&
-            !error &&
-            selectedRepo &&
+            !displayedError &&
+            activeSelectedRepo &&
             commits.length === 0 && (
               <p className="audit-status">
                 No commits found for this repository.
               </p>
             )}
 
-          {!loading && !profileLoading && !error && !profileError && (
+          {!loading && !profileLoading && !displayedError && !profileError && (
             <div className="audit-timeline">
               {commits.map((item) => {
                 // Prefer the GitHub login for the commit author.

@@ -1,10 +1,4 @@
-
-import {
-  useEffect,
-  useMemo,
-  useState,
-  type FormEvent,
-} from "react";
+import { useMemo, useState, type FormEvent } from "react";
 
 import { Link } from "react-router-dom";
 
@@ -17,19 +11,13 @@ import {
 } from "lucide-react";
 
 import RepositoryCard from "../components/github/RepositoryCard";
-
-// Fetch public GitHub profile and repository data.
 import { useGitHubRepositories } from "../hooks/useGitHubRepositories";
-
-// Read and save the username in the signed-in user's Supabase profile.
 import { useGitHubUsername } from "../hooks/useGitHubUsername";
-
-// Import the page's CSS styles.
 import "../styles/RepositoriesPage.css";
 
 export default function RepositoriesPage() {
-  // Store the username entered in the input field.
-  const [inputUsername, setInputUsername] = useState("");
+  // Store a username only when the user edits the input.
+  const [usernameDraft, setUsernameDraft] = useState<string | null>(null);
 
   // Store search and language filter values.
   const [search, setSearch] = useState("");
@@ -44,6 +32,9 @@ export default function RepositoriesPage() {
     saveUsername,
   } = useGitHubUsername();
 
+  // Use the saved username until the user edits the input.
+  const inputUsername = usernameDraft ?? username;
+
   // Do not fetch GitHub data before the profile loads.
   const activeUsername = profileLoading ? "" : username;
 
@@ -56,24 +47,15 @@ export default function RepositoriesPage() {
     refresh,
   } = useGitHubRepositories(activeUsername);
 
-  // Show the saved username after the profile finishes loading.
-  useEffect(() => {
-    if (!profileLoading) {
-      setInputUsername(username);
-    }
-  }, [profileLoading, username]);
-
   // Save the entered username to the current user's profile.
-  async function handleConnect(
-    event: FormEvent<HTMLFormElement>
-  ) {
+  async function handleConnect(event: FormEvent<HTMLFormElement>) {
     // Prevent the browser from reloading the page.
     event.preventDefault();
 
     // Remove extra spaces from the username.
     const cleanUsername = inputUsername.trim();
 
-    // Stop if the username is empty.
+    // Stop if the username is empty or the profile is busy.
     if (!cleanUsername || profileLoading || saving) {
       return;
     }
@@ -85,6 +67,9 @@ export default function RepositoriesPage() {
     if (!saved) {
       return;
     }
+
+    // Keep the saved username in the input.
+    setUsernameDraft(cleanUsername);
 
     // Reset search and language filters.
     setSearch("");
@@ -100,9 +85,7 @@ export default function RepositoriesPage() {
   const languages = useMemo(() => {
     const values = repositories
       .map((repository) => repository.language)
-      .filter(
-        (value): value is string => Boolean(value)
-      );
+      .filter((value): value is string => Boolean(value));
 
     return [...new Set(values)].sort();
   }, [repositories]);
@@ -115,14 +98,11 @@ export default function RepositoriesPage() {
       // Match repository name or description.
       const matchesSearch =
         repository.name.toLowerCase().includes(query) ||
-        (repository.description || "")
-          .toLowerCase()
-          .includes(query);
+        (repository.description || "").toLowerCase().includes(query);
 
       // Match the selected programming language.
       const matchesLanguage =
-        language === "all" ||
-        repository.language === language;
+        language === "all" || repository.language === language;
 
       return matchesSearch && matchesLanguage;
     });
@@ -137,12 +117,8 @@ export default function RepositoriesPage() {
   return (
     <main className="repositories-page">
       <div className="repositories-container">
-
         {/* Back navigation */}
-        <Link
-          to="/dashboard"
-          className="repositories-back"
-        >
+        <Link to="/dashboard" className="repositories-back">
           <ArrowLeft size={17} />
           Back to dashboard
         </Link>
@@ -173,8 +149,7 @@ export default function RepositoriesPage() {
             <h2>Explore GitHub repositories</h2>
 
             <p>
-              Enter a GitHub username to fetch public
-              repositories.
+              Enter a GitHub username to fetch public repositories.
             </p>
           </div>
 
@@ -194,9 +169,7 @@ export default function RepositoriesPage() {
               type="text"
               placeholder="Enter GitHub username"
               value={inputUsername}
-              onChange={(event) =>
-                setInputUsername(event.target.value)
-              }
+              onChange={(event) => setUsernameDraft(event.target.value)}
               disabled={profileLoading || saving}
               required
               pattern="[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?"
@@ -204,15 +177,9 @@ export default function RepositoriesPage() {
             />
 
             {/* Save username and load repositories */}
-            <button
-              type="submit"
-              disabled={isLoading || saving}
-            >
+            <button type="submit" disabled={isLoading || saving}>
               {isLoading || saving ? (
-                <RefreshCw
-                  size={18}
-                  className="repo-spin"
-                />
+                <RefreshCw size={18} className="repo-spin" />
               ) : (
                 <GitBranch size={18} />
               )}
@@ -234,10 +201,7 @@ export default function RepositoriesPage() {
 
         {/* Show database or GitHub API errors */}
         {displayError && (
-          <div
-            className="repositories-error"
-            role="alert"
-          >
+          <div className="repositories-error" role="alert">
             <AlertCircle size={20} />
             <span>{displayError}</span>
           </div>
@@ -245,14 +209,8 @@ export default function RepositoriesPage() {
 
         {/* Loading state */}
         {isLoading && (
-          <div
-            className="repositories-status"
-            role="status"
-          >
-            <RefreshCw
-              size={23}
-              className="repo-spin"
-            />
+          <div className="repositories-status" role="status">
+            <RefreshCw size={23} className="repo-spin" />
 
             <p>
               {profileLoading
@@ -302,28 +260,19 @@ export default function RepositoriesPage() {
                   placeholder="Search repositories..."
                   aria-label="Search repositories"
                   value={search}
-                  onChange={(event) =>
-                    setSearch(event.target.value)
-                  }
+                  onChange={(event) => setSearch(event.target.value)}
                 />
               </div>
 
               <select
                 aria-label="Filter by language"
                 value={language}
-                onChange={(event) =>
-                  setLanguage(event.target.value)
-                }
+                onChange={(event) => setLanguage(event.target.value)}
               >
-                <option value="all">
-                  All languages
-                </option>
+                <option value="all">All languages</option>
 
                 {languages.map((item) => (
-                  <option
-                    key={item}
-                    value={item}
-                  >
+                  <option key={item} value={item}>
                     {item}
                   </option>
                 ))}

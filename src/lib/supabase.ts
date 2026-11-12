@@ -1,16 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 
-// Read the Supabase project URL from the environment variables.
+// Read Supabase settings from the environment file.
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-
-// Read the public publishable key from the environment variables.
 const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-// Check that the required configuration is available.
+// Check that the required settings exist.
 if (!supabaseUrl || !supabaseKey) {
-  throw new Error(
-    "Supabase configuration is missing. Check your .env.local file."
-  );
+  throw new Error("Supabase settings are missing. Check .env.local");
 }
 
 // Create and export the Supabase client.
