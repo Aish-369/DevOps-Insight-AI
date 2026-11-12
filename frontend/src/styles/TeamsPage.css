@@ -1,0 +1,1029 @@
+.teams-page {
+    min-height: 100vh;
+    padding: 34px 24px 60px;
+    background: #f7f8fc;
+    color: #252940;
+    font-family: Inter, system-ui, sans-serif
+}
+
+.teams-page * {
+    box-sizing: border-box
+}
+
+.teams-container {
+    max-width: 1320px;
+    margin: 0 auto
+}
+
+.teams-back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+    color: #7061d1;
+    font-size: 13px;
+    font-weight: 650;
+    text-decoration: none
+}
+
+.teams-back-link:hover {
+    text-decoration: underline
+}
+
+.teams-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 22px;
+    margin-bottom: 24px
+}
+
+.teams-eyebrow {
+    margin: 0 0 10px;
+    color: #8172d7;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1.8px
+}
+
+.teams-header h1 {
+    margin: 0;
+    color: #252940;
+    font-size: clamp(27px, 3vw, 36px);
+    font-weight: 800;
+    letter-spacing: -1.1px
+}
+
+.teams-subtitle {
+    max-width: 660px;
+    margin: 10px 0 0;
+    color: #858ba0;
+    font-size: 14px;
+    line-height: 1.7
+}
+
+.teams-primary-button,
+.teams-secondary-button,
+.teams-invite-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 43px;
+    padding: 11px 16px;
+    border: 1px solid transparent;
+    border-radius: 11px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 750;
+    cursor: pointer;
+    transition: background .18s ease, transform .18s ease
+}
+
+.teams-primary-button {
+    background: #7061d1;
+    color: #fff;
+    box-shadow: 0 6px 14px #7061d11c
+}
+
+.teams-primary-button:hover {
+    background: #5e4fc0;
+    transform: translateY(-1px)
+}
+
+.teams-secondary-button {
+    border-color: #e2e3ef;
+    background: #fff;
+    color: #555a70
+}
+
+.teams-secondary-button:hover {
+    background: #f7f7fb
+}
+
+.teams-preview-note,
+.teams-success-note {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+    padding: 12px 15px;
+    border: 1px solid #e5e0ff;
+    border-radius: 12px;
+    background: #f0edff;
+    color: #6658bd;
+    font-size: 12px;
+    line-height: 1.5
+}
+
+.teams-success-note {
+    border-color: #cdebd9;
+    background: #effaf3;
+    color: #28764d
+}
+
+.teams-create-panel,
+.teams-panel {
+    border: 1px solid #e9ebf3;
+    border-radius: 18px;
+    background: #fff;
+    box-shadow: 0 7px 24px #262c5808
+}
+
+.teams-create-panel {
+    margin-bottom: 20px;
+    padding: 22px
+}
+
+.teams-create-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px
+}
+
+.teams-create-heading h2,
+.teams-panel-heading h2 {
+    margin: 0;
+    color: #292d43;
+    font-size: 17px;
+    font-weight: 800
+}
+
+.teams-create-heading p,
+.teams-panel-heading p {
+    margin: 6px 0 0;
+    color: #8d93a6;
+    font-size: 12px;
+    line-height: 1.6
+}
+
+.teams-icon-button {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    border: 1px solid #e6e7f1;
+    border-radius: 10px;
+    background: #fff;
+    color: #777d91;
+    cursor: pointer
+}
+
+.teams-icon-button:hover {
+    background: #f4f2ff;
+    color: #7061d1
+}
+
+.teams-create-form {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr;
+    gap: 16px;
+    margin-top: 18px
+}
+
+.teams-create-form label {
+    display: grid;
+    gap: 8px;
+    color: #484d63;
+    font-size: 12px;
+    font-weight: 750
+}
+
+.teams-create-form label>span:first-child {
+    color: #7061d1
+}
+
+.teams-create-form input,
+.teams-search input,
+.teams-member-search input,
+.teams-role-filter select {
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    padding: 11px 12px;
+    border: 1px solid #e4e6f0;
+    border-radius: 10px;
+    background: #fbfbfe;
+    color: #292d43;
+    font: inherit;
+    font-size: 12px;
+    outline: none
+}
+
+.teams-create-form input:focus,
+.teams-search:focus-within,
+.teams-member-search:focus-within,
+.teams-role-filter select:focus {
+    border-color: #a69ae9;
+    box-shadow: 0 0 0 3px #8b7ce21a
+}
+
+.teams-optional {
+    color: #a1a6b5 !important;
+    font-weight: 500
+}
+
+.teams-form-actions {
+    grid-column: 1/-1;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 2px
+}
+
+.teams-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 20px
+}
+
+.teams-metric-card {
+    position: relative;
+    display: grid;
+    grid-template-columns: 46px 1fr;
+    align-items: center;
+    gap: 12px;
+    min-height: 110px;
+    padding: 19px;
+    border: 1px solid #e9ebf3;
+    border-radius: 16px;
+    background: #fff
+}
+
+.teams-metric-icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 13px
+}
+
+.teams-metric-icon.purple {
+    background: #f0edff;
+    color: #7061d1
+}
+
+.teams-metric-icon.blue {
+    background: #eaf3ff;
+    color: #3976c5
+}
+
+.teams-metric-icon.green {
+    background: #e8f8ef;
+    color: #31966a
+}
+
+.teams-metric-card p {
+    margin: 0 0 4px;
+    color: #858ba0;
+    font-size: 12px
+}
+
+.teams-metric-card strong {
+    color: #282c43;
+    font-size: 25px;
+    letter-spacing: -.5px
+}
+
+.teams-metric-caption {
+    position: absolute;
+    right: 16px;
+    bottom: 13px;
+    color: #a0a5b3;
+    font-size: 10px
+}
+
+.teams-content-grid {
+    display: grid;
+    grid-template-columns: minmax(280px, .78fr) minmax(0, 1.65fr);
+    align-items: start;
+    gap: 18px
+}
+
+.teams-panel {
+    min-width: 0;
+    padding: 21px
+}
+
+.teams-panel-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 19px
+}
+
+.teams-count-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 27px;
+    height: 25px;
+    padding: 0 8px;
+    border-radius: 8px;
+    background: #f0edff;
+    color: #7061d1;
+    font-size: 11px;
+    font-weight: 800
+}
+
+.teams-search,
+.teams-member-search {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    padding-left: 12px;
+    border: 1px solid #e4e6f0;
+    border-radius: 10px;
+    background: #fbfbfe;
+    color: #9298aa
+}
+
+.teams-search input,
+.teams-member-search input {
+    border: 0;
+    background: transparent;
+    box-shadow: none
+}
+
+.teams-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 15px
+}
+
+.teams-list-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
+    padding: 13px 11px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background: #fff;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease
+}
+
+.teams-list-item:hover {
+    background: #faf9ff
+}
+
+.teams-list-item.selected {
+    border-color: #ded8ff;
+    background: #f5f3ff
+}
+
+.teams-avatar {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    border-radius: 13px;
+    font-size: 12px;
+    font-weight: 850
+}
+
+.teams-avatar-lavender {
+    background: #eeeaff;
+    color: #7061d1
+}
+
+.teams-avatar-mint {
+    background: #e5f8ef;
+    color: #28845d
+}
+
+.teams-avatar-peach {
+    background: #fff0e7;
+    color: #c17a4c
+}
+
+.teams-list-copy {
+    display: grid;
+    gap: 5px;
+    flex: 1;
+    min-width: 0
+}
+
+.teams-list-copy strong {
+    overflow: hidden;
+    color: #30344a;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap
+}
+
+.teams-list-copy small {
+    color: #9298aa;
+    font-size: 10px
+}
+
+.teams-list-chevron {
+    flex-shrink: 0;
+    color: #a0a5b4
+}
+
+.teams-add-workspace {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    margin-top: 14px;
+    padding: 13px;
+    border: 1px dashed #d8d4f1;
+    border-radius: 11px;
+    background: #fcfbff;
+    color: #7061d1;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 750;
+    cursor: pointer
+}
+
+.teams-add-workspace:hover {
+    background: #f3f0ff
+}
+
+.teams-detail-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px
+}
+
+.teams-avatar-large {
+    width: 54px;
+    height: 54px;
+    border-radius: 15px;
+    font-size: 15px
+}
+
+.teams-detail-title {
+    flex: 1;
+    min-width: 0
+}
+
+.teams-detail-label {
+    margin: 0 0 7px;
+    color: #8172d7;
+    font-size: 9px;
+    font-weight: 850;
+    letter-spacing: 1.5px
+}
+
+.teams-detail-title h2 {
+    margin: 0 0 7px;
+    overflow-wrap: anywhere;
+    color: #292d43;
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: -.4px
+}
+
+.teams-detail-title>p:last-child {
+    margin: 0;
+    color: #858ba0;
+    font-size: 12px;
+    line-height: 1.6
+}
+
+.teams-detail-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin: 21px 0;
+    padding: 16px 0;
+    border-top: 1px solid #f0f0f6;
+    border-bottom: 1px solid #f0f0f6
+}
+
+.teams-detail-stats div {
+    display: grid;
+    gap: 6px
+}
+
+.teams-detail-stats span {
+    color: #9399aa;
+    font-size: 11px
+}
+
+.teams-detail-stats strong {
+    color: #30344a;
+    font-size: 15px
+}
+
+.teams-members-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px
+}
+
+.teams-members-heading h3 {
+    margin: 0;
+    color: #30344a;
+    font-size: 15px;
+    font-weight: 800
+}
+
+.teams-members-heading p {
+    margin: 5px 0 0;
+    color: #969bad;
+    font-size: 11px
+}
+
+.teams-member-toolbar {
+    display: flex;
+    gap: 10px;
+    margin: 17px 0 12px
+}
+
+.teams-member-search {
+    flex: 1
+}
+
+.teams-role-filter {
+    width: 118px;
+    flex-shrink: 0
+}
+
+.teams-role-filter select {
+    padding: 10px;
+    background: #fff
+}
+
+.teams-table-wrap {
+    width: 100%;
+    overflow-x: auto
+}
+
+.teams-members-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left
+}
+
+.teams-members-table th {
+    padding: 12px 9px;
+    border-bottom: 1px solid #eeeef5;
+    color: #9298aa;
+    font-size: 10px;
+    font-weight: 750;
+    letter-spacing: .3px;
+    text-transform: uppercase
+}
+
+.teams-members-table td {
+    padding: 13px 9px;
+    border-bottom: 1px solid #f1f1f7;
+    vertical-align: middle
+}
+
+.teams-member-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 170px
+}
+
+.teams-member-avatar {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    border-radius: 11px;
+    font-size: 10px;
+    font-weight: 850
+}
+
+.teams-member-avatar.purple {
+    background: #eeeaff;
+    color: #7061d1
+}
+
+.teams-member-avatar.blue {
+    background: #eaf3ff;
+    color: #3976c5
+}
+
+.teams-member-avatar.green {
+    background: #e5f8ef;
+    color: #28845d
+}
+
+.teams-member-avatar.peach {
+    background: #fff0e7;
+    color: #c17a4c
+}
+
+.teams-member-cell>span:last-child {
+    display: grid;
+    gap: 4px;
+    min-width: 0
+}
+
+.teams-member-cell strong {
+    color: #363a50;
+    font-size: 11px;
+    white-space: nowrap
+}
+
+.teams-member-cell small {
+    color: #999fb0;
+    font-size: 10px;
+    overflow-wrap: anywhere
+}
+
+.teams-role-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
+    border-radius: 7px;
+    font-size: 10px;
+    font-weight: 750;
+    white-space: nowrap
+}
+
+.teams-role-badge.owner {
+    background: #f0edff;
+    color: #7061d1
+}
+
+.teams-role-badge.admin {
+    background: #eaf3ff;
+    color: #3976c5
+}
+
+.teams-role-badge.member {
+    background: #f1f3f7;
+    color: #6f7587
+}
+
+.teams-access-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: #31966a;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap
+}
+
+.teams-members-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 15px;
+    color: #969bad;
+    font-size: 10px
+}
+
+.teams-invite-button {
+    min-height: 36px;
+    padding: 8px 11px;
+    border-color: #ded8ff;
+    background: #f6f4ff;
+    color: #7061d1;
+    font-size: 11px
+}
+
+.teams-invite-button:hover {
+    background: #eeeaff
+}
+
+.teams-empty {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    gap: 9px;
+    padding: 35px 15px;
+    color: #989db0;
+    text-align: center
+}
+
+.teams-empty strong {
+    color: #555a70;
+    font-size: 12px
+}
+
+.teams-empty span {
+    font-size: 11px
+}
+
+.teams-member-empty {
+    padding: 25px 12px
+}
+
+.teams-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 21px;
+    color: #8f95a8;
+    font-size: 11px;
+    line-height: 1.6;
+    text-align: center
+}
+
+.teams-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0
+}
+
+@media(max-width:1000px) {
+    .teams-content-grid {
+        grid-template-columns: 1fr
+    }
+
+    .teams-list-panel {
+        order: 1
+    }
+
+    .teams-detail-panel {
+        order: 2
+    }
+
+    .teams-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr))
+    }
+
+    .teams-add-workspace {
+        margin-top: 12px
+    }
+
+    .teams-list-item {
+        min-width: 0
+    }
+}
+
+@media(max-width:650px) {
+    .teams-page {
+        padding: 22px 14px 40px
+    }
+
+    .teams-header {
+        align-items: flex-start;
+        flex-direction: column
+    }
+
+    .teams-header>.teams-primary-button {
+        width: 100%
+    }
+
+    .teams-create-form {
+        grid-template-columns: 1fr
+    }
+
+    .teams-form-actions {
+        grid-column: auto
+    }
+
+    .teams-metrics {
+        grid-template-columns: 1fr;
+        gap: 10px
+    }
+
+    .teams-metric-card {
+        min-height: 90px
+    }
+
+    .teams-content-grid {
+        gap: 13px
+    }
+
+    .teams-panel {
+        padding: 16px
+    }
+
+    .teams-list {
+        grid-template-columns: 1fr
+    }
+
+    .teams-detail-top {
+        gap: 10px
+    }
+
+    .teams-detail-title h2 {
+        font-size: 17px
+    }
+
+    .teams-detail-stats {
+        gap: 8px
+    }
+
+    .teams-detail-stats span {
+        font-size: 10px
+    }
+
+    .teams-detail-stats strong {
+        font-size: 13px
+    }
+
+    .teams-member-toolbar {
+        flex-direction: column
+    }
+
+    .teams-role-filter {
+        width: 100%
+    }
+
+    .teams-members-footer {
+        align-items: flex-start;
+        flex-direction: column
+    }
+
+    .teams-invite-button {
+        width: 100%
+    }
+
+    .teams-footer {
+        align-items: flex-start;
+        justify-content: flex-start
+    }
+}
+
+/* Compact the page and reduce unnecessary vertical spacing. */
+.teams-page {
+    padding-top: 24px;
+}
+
+.teams-back-link {
+    margin-bottom: 18px;
+}
+
+.teams-header {
+    margin-bottom: 20px;
+}
+
+.teams-eyebrow {
+    margin-bottom: 7px;
+}
+
+.teams-subtitle {
+    margin-top: 7px;
+    line-height: 1.5;
+}
+
+/* Make summary cards smaller. */
+.teams-metrics {
+    gap: 13px;
+    margin-bottom: 16px;
+}
+
+.teams-metric-card {
+    min-height: 88px;
+    padding: 14px 16px;
+    border-radius: 14px;
+}
+
+.teams-metric-icon {
+    width: 40px;
+    height: 40px;
+}
+
+.teams-metric-card strong {
+    font-size: 23px;
+}
+
+.teams-metric-caption {
+    right: 13px;
+    bottom: 9px;
+    font-size: 9px;
+}
+
+/* Reduce workspace panel spacing. */
+.teams-content-grid {
+    gap: 14px;
+}
+
+.teams-panel {
+    padding: 18px;
+    border-radius: 16px;
+}
+
+.teams-panel-heading {
+    margin-bottom: 14px;
+}
+
+.teams-list {
+    gap: 6px;
+    margin-top: 11px;
+}
+
+.teams-list-item {
+    padding: 10px;
+}
+
+.teams-detail-stats {
+    margin: 16px 0;
+    padding: 13px 0;
+}
+
+.teams-member-toolbar {
+    margin: 12px 0 9px;
+}
+
+.teams-members-table th {
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
+.teams-members-table td {
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
+/* Toast popup: replaces large success and preview banners. */
+.teams-toast {
+    position: fixed;
+    top: 22px;
+    right: 22px;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: min(420px, calc(100vw - 32px));
+    padding: 13px 14px;
+    border: 1px solid #cdebd9;
+    border-radius: 13px;
+    background: #ffffff;
+    color: #28764d;
+    box-shadow: 0 12px 40px rgba(37, 41, 64, 0.14);
+    font-size: 12px;
+    line-height: 1.5;
+    animation: teams-toast-in 0.22s ease-out;
+}
+
+.teams-toast>svg {
+    flex-shrink: 0;
+}
+
+.teams-toast>span {
+    flex: 1;
+    overflow-wrap: anywhere;
+}
+
+.teams-toast-close {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: #687b70;
+    cursor: pointer;
+}
+
+.teams-toast-close:hover {
+    background: #effaf3;
+}
+
+@keyframes teams-toast-in {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 650px) {
+    .teams-page {
+        padding-top: 18px;
+    }
+
+    .teams-metric-card {
+        min-height: 82px;
+    }
+
+    .teams-toast {
+        top: 12px;
+        right: 12px;
+        width: calc(100vw - 24px);
+    }
+}
