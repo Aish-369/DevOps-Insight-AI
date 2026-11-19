@@ -125,7 +125,7 @@ npm install
 
 ### 3. Configure environment variables
 
-Create `frontend/.env.local`:
+Create .env.local:
 
 ```dotenv
 VITE_SUPABASE_URL=your_supabase_project_url
