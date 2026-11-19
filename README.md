@@ -142,7 +142,11 @@ The frontend's Supabase client should read these variables. Configure your authe
 npm run dev
 ```
 
-Open the local URL printed by Vite (usually `http://localhost:5173`).
+Open the local URL printed by Vite.
+
+In the current development configuration, the app runs at:
+http://localhost:5175
+
 
 ### 5. Build for production
 
