@@ -9,8 +9,6 @@ import SignupPage from "./pages/SignupPage";
 import DashboardPage from "./pages/DashboardPage";
 import RepositoriesPage from "./pages/RepositoriesPage";
 import PipelinesPage from "./pages/PipelinesPage";
-
-// Import the new GitHub Activity Audit page.
 import ActivityAuditPage from "./pages/ActivityAuditPage";
 import TeamsPage from "./pages/TeamsPage";
 
@@ -20,17 +18,14 @@ import ProtectedRoute from "./components/auth/ProtectedRoute";
 export default function App() {
   return (
     <Routes>
-      {/* Redirect the homepage to login. */}
-      <Route
-        path="/"
-        element={<Navigate to="/login" replace />}
-      />
+      {/* Redirect homepage to login. */}
+      <Route path="/" element={<Navigate to="/login" replace />} />
 
-      {/* Public pages do not require login. */}
+      {/* Public routes. */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
 
-      {/* Show dashboard only to authenticated users. */}
+      {/* Protected dashboard route. */}
       <Route
         path="/dashboard"
         element={
@@ -40,7 +35,7 @@ export default function App() {
         }
       />
 
-      {/* Show GitHub repositories after login. */}
+      {/* GitHub repositories route. */}
       <Route
         path="/repositories"
         element={
@@ -50,7 +45,7 @@ export default function App() {
         }
       />
 
-      {/* Show CI/CD pipelines after login. */}
+      {/* CI/CD pipelines route. */}
       <Route
         path="/pipelines"
         element={
@@ -60,7 +55,7 @@ export default function App() {
         }
       />
 
-      {/* NEW: Show GitHub Activity Audit after login. */}
+      {/* GitHub activity audit route. */}
       <Route
         path="/activity"
         element={
@@ -70,7 +65,7 @@ export default function App() {
         }
       />
 
-      {/* Show team workspaces after login. */}
+      {/* Teams and workspaces route. */}
       <Route
         path="/teams"
         element={

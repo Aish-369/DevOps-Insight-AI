@@ -1,0 +1,35 @@
+﻿diff --git a/src/pages/DashboardPage.tsx b/frontend/src/pages/DashboardPage.tsx
+index e58f506..d557b43 100644
+--- a/src/pages/DashboardPage.tsx
++++ b/frontend/src/pages/DashboardPage.tsx
+@@ -1,5 +1,4 @@
+-
+-import { useEffect, useState } from "react";
++∩╗┐import { useEffect, useState } from "react";
+ import { Link, useNavigate } from "react-router-dom";
+ import {
+   Activity,
+@@ -9,7 +8,6 @@ import {
+   LogOut,
+   RefreshCw,
+   ShieldCheck,
+-  Users,
+   Workflow,
+ } from "lucide-react";
+ 
+@@ -285,15 +283,6 @@ export default function DashboardPage() {
+             <span>Pipelines</span>
+           </Link>
+ 
+-          {/* Navigate to Teams and Workspaces. */}
+-          <Link
+-            to="/teams"
+-            className="dashboard-nav-item"
+-          >
+-            <Users size={19} />
+-            <span>Teams & Workspaces</span>
+-          </Link>
+-
+           <Link
+             to="/activity"
+             className="dashboard-nav-item"

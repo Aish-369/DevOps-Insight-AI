@@ -1,0 +1,2520 @@
+PHASE 0 - ROOT VS FRONTEND SOURCE DIFF
+
+
+===== App.css =====
+warning: in the working copy of 'src/App.css', LF will be replaced by CRLF the next time Git touches it
+
+
+===== App.tsx =====
+warning: in the working copy of 'src/App.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/App.tsx', LF will be replaced by CRLF the next time Git touches it
+diff --git a/src/App.tsx b/frontend/src/App.tsx
+index eefc79d..a4d01cc 100644
+--- a/src/App.tsx
++++ b/frontend/src/App.tsx
+@@ -1,5 +1,4 @@
+-
+-import { Routes, Route, Navigate } from "react-router-dom";
++n++import { Routes, Route, Navigate } from "react-router-dom";
+ 
+ // Import authentication pages.
+ import LoginPage from "./pages/LoginPage";
+@@ -18,68 +17,37 @@ import ProtectedRoute from "./components/auth/ProtectedRoute";
+ export default function App() {
+   return (
+     <Routes>
+-      {/* Redirect homepage to login. */}
+       <Route path="/" element={<Navigate to="/login" replace />} />
+-
+-      {/* Public routes. */}
+       <Route path="/login" element={<LoginPage />} />
+       <Route path="/signup" element={<SignupPage />} />
+ 
+-      {/* Protected dashboard route. */}
+       <Route
+         path="/dashboard"
+-        element={
+-          <ProtectedRoute>
+-            <DashboardPage />
+-          </ProtectedRoute>
+-        }
++        element={<ProtectedRoute><DashboardPage /></ProtectedRoute>}
+       />
+ 
+-      {/* GitHub repositories route. */}
+       <Route
+         path="/repositories"
+-        element={
+-          <ProtectedRoute>
+-            <RepositoriesPage />
+-          </ProtectedRoute>
+-        }
++        element={<ProtectedRoute><RepositoriesPage /></ProtectedRoute>}
+       />
+ 
+-      {/* CI/CD pipelines route. */}
+       <Route
+         path="/pipelines"
+-        element={
+-          <ProtectedRoute>
+-            <PipelinesPage />
+-          </ProtectedRoute>
+-        }
++        element={<ProtectedRoute><PipelinesPage /></ProtectedRoute>}
+       />
+ 
+-      {/* GitHub activity audit route. */}
+       <Route
+         path="/activity"
+-        element={
+-          <ProtectedRoute>
+-            <ActivityAuditPage />
+-          </ProtectedRoute>
+-        }
++        element={<ProtectedRoute><ActivityAuditPage /></ProtectedRoute>}
+       />
+ 
+-      {/* Teams and workspaces route. */}
++      {/* Teams and Workspaces page. */}
+       <Route
+         path="/teams"
+-        element={
+-          <ProtectedRoute>
+-            <TeamsPage />
+-          </ProtectedRoute>
+-        }
++        element={<ProtectedRoute><TeamsPage /></ProtectedRoute>}
+       />
+ 
+-      {/* Redirect unknown URLs to login. */}
+-      <Route
+-        path="*"
+-        element={<Navigate to="/login" replace />}
+-      />
++      <Route path="*" element={<Navigate to="/login" replace />} />
+     </Routes>
+   );
+ }
+
+
+===== assets/vite.svg =====
+warning: in the working copy of 'src/assets/vite.svg', LF will be replaced by CRLF the next time Git touches it
+
+
+===== components/auth/LoginForm.tsx =====
+warning: in the working copy of 'src/components/auth/LoginForm.tsx', LF will be replaced by CRLF the next time Git touches it
+
+
+===== components/auth/ProtectedRoute.tsx =====
+warning: in the working copy of 'src/components/auth/ProtectedRoute.tsx', LF will be replaced by CRLF the next time Git touches it
+
+
+===== components/github/RepositoryCard.tsx =====
+warning: in the working copy of 'src/components/github/RepositoryCard.tsx', LF will be replaced by CRLF the next time Git touches it
+
+
+===== hooks/useGitHubRepositories.ts =====
+warning: in the working copy of 'src/hooks/useGitHubRepositories.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/hooks/useGitHubRepositories.ts', LF will be replaced by CRLF the next time Git touches it
+diff --git a/src/hooks/useGitHubRepositories.ts b/frontend/src/hooks/useGitHubRepositories.ts
+index 48cb5ca..4efd9d5 100644
+--- a/src/hooks/useGitHubRepositories.ts
++++ b/frontend/src/hooks/useGitHubRepositories.ts
+@@ -1,5 +1,4 @@
+-
+-import { useEffect, useState } from "react";
++n++import { useEffect, useState } from "react";
+ 
+ import {
+   fetchGitHubProfile,
+
+
+===== hooks/useGitHubUsername.ts =====
+warning: in the working copy of 'src/hooks/useGitHubUsername.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/hooks/useGitHubUsername.ts', LF will be replaced by CRLF the next time Git touches it
+diff --git a/src/hooks/useGitHubUsername.ts b/frontend/src/hooks/useGitHubUsername.ts
+index 0478dcd..7833301 100644
+--- a/src/hooks/useGitHubUsername.ts
++++ b/frontend/src/hooks/useGitHubUsername.ts
+@@ -1,114 +1,96 @@
+-
+-import { useCallback, useEffect, useState } from "react";
++n++import { useCallback, useEffect, useState } from "react";
+ 
+ import { supabase } from "../lib/supabase";
+ 
+-// Store the result of a username request.
+-type UsernameResult = {
+-  requestId: number;
+-  username: string;
+-  error: string;
+-};
+-
+ // Manage the GitHub username for the signed-in user.
+ export function useGitHubUsername() {
++  const [username, setUsername] = useState("");
++  const [loading, setLoading] = useState(true);
+   const [saving, setSaving] = useState(false);
++  const [error, setError] = useState("");
+ 
+-  // Track requests so the username can be reloaded.
+-  const [requestId, setRequestId] = useState(0);
++  // Fetch the username without directly updating React state.
++  const fetchUsername = useCallback(async (): Promise<string> => {
++    // Get the currently signed-in Supabase user.
++    const { data: authData, error: authError } =
++      await supabase.auth.getUser();
+ 
+-  // Store the latest completed request.
+-  const [result, setResult] = useState<UsernameResult>({
+-    requestId: -1,
+-    username: "",
+-    error: "",
+-  });
++    if (authError) throw authError;
+ 
+-  // Load the username when the request ID changes.
+-  useEffect(() => {
+-    let active = true;
++    // Return an empty username if nobody is signed in.
++    if (!authData.user) {
++      return "";
++    }
+ 
+-    async function loadUsername() {
+-      try {
+-        // Verify the currently signed-in Supabase user.
+-        const { data: authData, error: authError } =
+-          await supabase.auth.getUser();
+-
+-        if (authError) throw authError;
+-
+-        // Clear the username if nobody is signed in.
+-        if (!authData.user) {
+-          if (active) {
+-            setResult({
+-              requestId,
+-              username: "",
+-              error: "",
+-            });
+-          }
+-          return;
+-        }
++    // Read only this user's GitHub username.
++    const { data, error: profileError } = await supabase
++      .from("profiles")
++      .select("github_username")
++      .eq("id", authData.user.id)
++      .maybeSingle();
++
++    if (profileError) throw profileError;
+ 
+-        // Read only this user's GitHub username.
+-        const { data, error: profileError } = await supabase
+-          .from("profiles")
+-          .select("github_username")
+-          .eq("id", authData.user.id)
+-          .maybeSingle();
++    return data?.github_username ?? "";
++  }, []);
+ 
+-        if (profileError) throw profileError;
++  // Load the username when the hook is first used.
++  useEffect(() => {
++    let active = true;
+ 
+-        // Save the result only if this request is still active.
++    // Fetch data asynchronously and update state after completion.
++    fetchUsername()
++      .then((value) => {
+         if (active) {
+-          setResult({
+-            requestId,
+-            username: data?.github_username ?? "",
+-            error: "",
+-          });
++          setUsername(value);
+         }
+-      } catch (err) {
+-        // Store errors only for the active request.
++      })
++      .catch((err: unknown) => {
+         if (active) {
+-          setResult({
+-            requestId,
+-            username: "",
+-            error:
+-              err instanceof Error
+-                ? err.message
+-                : "Unable to load the GitHub username.",
+-          });
++          setError(
++            err instanceof Error
++              ? err.message
++              : "Unable to load the GitHub username."
++          );
+         }
+-      }
+-    }
+-
+-    // Start the asynchronous profile request.
+-    void loadUsername();
++      })
++      .finally(() => {
++        if (active) {
++          setLoading(false);
++        }
++      });
+ 
+-    // Ignore outdated requests when the effect is cleaned up.
++    // Ignore results after the component unmounts.
+     return () => {
+       active = false;
+     };
+-  }, [requestId]);
+-
+-  // Check whether the current request has completed.
+-  const isCurrentResult = result.requestId === requestId;
+-
+-  // Derive the loading state from the request result.
+-  const loading = !isCurrentResult;
++  }, [fetchUsername]);
+ 
+-  // Show only the result belonging to the current request.
+-  const username = isCurrentResult ? result.username : "";
+-  const error = isCurrentResult ? result.error : "";
++  // Reload the username when requested by the UI.
++  const reloadUsername = useCallback(async () => {
++    setLoading(true);
++    setError("");
+ 
+-  // Reload the username from Supabase.
+-  const loadUsername = useCallback(() => {
+-    setRequestId((previous) => previous + 1);
+-  }, []);
++    try {
++      const value = await fetchUsername();
++      setUsername(value);
++    } catch (err) {
++      setError(
++        err instanceof Error
++          ? err.message
++          : "Unable to load the GitHub username."
++      );
++    } finally {
++      setLoading(false);
++    }
++  }, [fetchUsername]);
+ 
+   // Save the username to the signed-in user's profile.
+   const saveUsername = useCallback(async (value: string) => {
+     const cleanUsername = value.trim();
+ 
+     setSaving(true);
++    setError("");
+ 
+     try {
+       // Verify the currently signed-in user.
+@@ -135,26 +117,19 @@ export function useGitHubUsername() {
+         throw new Error("Profile not found or update not permitted.");
+       }
+ 
+-      // Reload the saved username from the database.
+-      loadUsername();
+-
++      setUsername(cleanUsername);
+       return true;
+     } catch (err) {
+-      // Store save errors for the user interface.
+-      setResult({
+-        requestId,
+-        username,
+-        error:
+-          err instanceof Error
+-            ? err.message
+-            : "Unable to save the GitHub username.",
+-      });
+-
++      setError(
++        err instanceof Error
++          ? err.message
++          : "Unable to save the GitHub username."
++      );
+       return false;
+     } finally {
+       setSaving(false);
+     }
+-  }, [loadUsername, requestId, username]);
++  }, []);
+ 
+   // Return the profile state and actions to the page.
+   return {
+@@ -163,6 +138,6 @@ export function useGitHubUsername() {
+     saving,
+     error,
+     saveUsername,
+-    reloadUsername: loadUsername,
++    reloadUsername,
+   };
+ }
+
+
+===== index.css =====
+warning: in the working copy of 'src/index.css', LF will be replaced by CRLF the next time Git touches it
+
+
+===== lib/apiCache.ts =====
+warning: in the working copy of 'src/lib/apiCache.ts', LF will be replaced by CRLF the next time Git touches it
+
+
+===== lib/github.ts =====
+warning: in the working copy of 'src/lib/github.ts', LF will be replaced by CRLF the next time Git touches it
+
+
+===== lib/githubActivity.ts =====
+warning: in the working copy of 'src/lib/githubActivity.ts', LF will be replaced by CRLF the next time Git touches it
+
+
+===== lib/pipelines.ts =====
+warning: in the working copy of 'src/lib/pipelines.ts', LF will be replaced by CRLF the next time Git touches it
+
+
+===== lib/supabase.ts =====
+warning: in the working copy of 'src/lib/supabase.ts', LF will be replaced by CRLF the next time Git touches it
+
+
+===== main.tsx =====
+warning: in the working copy of 'src/main.tsx', LF will be replaced by CRLF the next time Git touches it
+
+
+===== pages/ActivityAuditPage.tsx =====
+warning: in the working copy of 'src/pages/ActivityAuditPage.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/ActivityAuditPage.tsx', LF will be replaced by CRLF the next time Git touches it
+diff --git a/src/pages/ActivityAuditPage.tsx b/frontend/src/pages/ActivityAuditPage.tsx
+index b515b31..695ddff 100644
+--- a/src/pages/ActivityAuditPage.tsx
++++ b/frontend/src/pages/ActivityAuditPage.tsx
+@@ -1,5 +1,4 @@
+-
+-import { useEffect, useState, type FormEvent } from "react";
++n++import { useEffect, useState, type FormEvent } from "react";
+ import { Link } from "react-router-dom";
+ import {
+   Activity,
+@@ -25,12 +24,19 @@ import {
+ 
+ import "../styles/ActivityAuditPage.css";
+ 
++// Store the result of a commit request with its request key.
++type CommitResult = {
++  requestKey: string;
++  commits: GitHubCommit[];
++  error: string;
++};
++
+ export default function ActivityAuditPage() {
+-  // Store the username manually entered by the user.
+-  const [usernameInputOverride, setUsernameInputOverride] =
+-    useState<string | null>(null);
++  // Store the username entered into the form.
++  const [usernameInput, setUsernameInput] = useState("");
++  const [usernameEdited, setUsernameEdited] = useState(false);
+ 
+-  // Load the saved GitHub username from Supabase.
++  // Load the signed-in user's GitHub username from Supabase.
+   const {
+     username,
+     loading: usernameLoading,
+@@ -38,9 +44,6 @@ export default function ActivityAuditPage() {
+     saveUsername,
+   } = useGitHubUsername();
+ 
+-  // Use the saved username unless the user edits the input.
+-  const usernameInput = usernameInputOverride ?? username;
+-
+   // Load repositories belonging to the saved GitHub username.
+   const {
+     repositories,
+@@ -50,50 +53,76 @@ export default function ActivityAuditPage() {
+     usernameLoading || usernameError ? "" : username
+   );
+ 
+-  // Store the repository selected by the user.
++  // Store the currently selected repository.
+   const [selectedRepo, setSelectedRepo] = useState("");
+ 
+-  // Keep the selected repository valid when the list changes.
+-  const activeSelectedRepo = repositories.some(
+-    (repo) => repo.full_name === selectedRepo
+-  )
+-    ? selectedRepo
+-    : repositories[0]?.full_name || "";
+-
+-  // Store recent commits.
+-  const [commits, setCommits] = useState<GitHubCommit[]>([]);
+-
+   // Store the currently expanded commit details.
+   const [selectedCommit, setSelectedCommit] =
+     useState<GitHubCommitDetail | null>(null);
+ 
+-  // Track commit loading, details loading, and errors.
+-  const [loading, setLoading] = useState(false);
++  // Track commit details loading and errors.
+   const [detailsLoading, setDetailsLoading] = useState(false);
+-  const [error, setError] = useState("");
+   const [detailsError, setDetailsError] = useState("");
+ 
++  // Store form validation or username-saving errors.
++  const [error, setError] = useState("");
++
++  // Store the latest commit request result.
++  const [commitResult, setCommitResult] =
++    useState<CommitResult | null>(null);
++
+   // Increment this value to refresh the commit list.
+   const [refreshKey, setRefreshKey] = useState(0);
+ 
+-  // Load recent commits for the active repository.
++  // Keep the selected repository if it still exists.
++  // Otherwise, use the first available repository.
++  const activeSelectedRepo = repositories.some(
++    (repo) => repo.full_name === selectedRepo
++  )
++    ? selectedRepo
++    : repositories[0]?.full_name ?? "";
++
++  // Identify the current repository and refresh request.
++  const commitRequestKey = `${activeSelectedRepo}:${refreshKey}`;
++
++  // Only display commit data belonging to the current request.
++  const currentCommitResult =
++    commitResult?.requestKey === commitRequestKey
++      ? commitResult
++      : null;
++
++  // Derive commits and errors from the current request result.
++  const commits = currentCommitResult?.commits ?? [];
++  const commitError = currentCommitResult?.error ?? "";
++
++  // Combine profile and repository loading states.
++  const profileLoading = usernameLoading || reposLoading;
++
++  // Display the first available profile or repository error.
++  const profileError = usernameError || reposError;
++
++  // Show loading while the current commit request has no result.
++  const loading =
++    !profileLoading &&
++    !profileError &&
++    Boolean(activeSelectedRepo) &&
++    !currentCommitResult;
++
++  // Load recent commits for the selected repository.
+   useEffect(() => {
+-    // Wait until the profile and repositories finish loading.
++    // Wait until the username and repositories have loaded.
+     if (usernameLoading || reposLoading) return;
+ 
+-    // Do not fetch when profile loading failed or no repository exists.
+-    if (usernameError || reposError || !activeSelectedRepo) return;
++    // Do not fetch commits when profile or repository loading failed.
++    if (usernameError || reposError) return;
++
++    // Do not fetch commits when no repository is selected.
++    if (!activeSelectedRepo) return;
+ 
+-    // Cancel outdated requests when the repository changes.
++    // Allow outdated requests to be cancelled.
+     const controller = new AbortController();
+ 
+     async function loadCommits() {
+-      setLoading(true);
+-      setError("");
+-      setCommits([]);
+-      setSelectedCommit(null);
+-      setDetailsError("");
+-
+       try {
+         // Split the repository name into owner and repository.
+         const [owner, repo] = activeSelectedRepo.split("/");
+@@ -102,52 +131,54 @@ export default function ActivityAuditPage() {
+           throw new Error("Invalid repository selection.");
+         }
+ 
+-        // Fetch recent commits from the GitHub repository.
++        // Fetch recent commits from the public GitHub repository.
+         const result = await fetchRepositoryCommits(
+           owner,
+           repo,
+           controller.signal
+         );
+ 
+-        // Update commits only if this request is still active.
++        // Ignore results from a cancelled request.
+         if (!controller.signal.aborted) {
+-          setCommits(result);
++          setCommitResult({
++            requestKey: commitRequestKey,
++            commits: result,
++            error: "",
++          });
+         }
+       } catch (err) {
+         // Ignore errors from requests that were cancelled.
+         if (!controller.signal.aborted) {
+-          setError(
+-            err instanceof Error
+-              ? err.message
+-              : "Unable to load commit activity."
+-          );
+-        }
+-      } finally {
+-        // Finish loading only for the active request.
+-        if (!controller.signal.aborted) {
+-          setLoading(false);
++          setCommitResult({
++            requestKey: commitRequestKey,
++            commits: [],
++            error:
++              err instanceof Error
++                ? err.message
++                : "Unable to load commit activity.",
++          });
+         }
+       }
+     }
+ 
+     void loadCommits();
+ 
+-    // Cancel the request if its dependencies change.
++    // Cancel the request if the repository or refresh key changes.
+     return () => controller.abort();
+   }, [
+     activeSelectedRepo,
+-    refreshKey,
++    commitRequestKey,
+     usernameLoading,
+     usernameError,
+     reposLoading,
+     reposError,
+   ]);
+ 
+-  // Validate and save the GitHub username.
++  // Validate and save the username to the signed-in user's profile.
+   async function handleSearch(event: FormEvent<HTMLFormElement>) {
+     event.preventDefault();
+ 
+-    // Accept a GitHub username or supported profile URL.
++    // Accept a GitHub username or a supported GitHub profile URL.
+     const cleanUsername = extractGitHubUsername(usernameInput);
+ 
+     if (!cleanUsername) {
+@@ -157,27 +188,26 @@ export default function ActivityAuditPage() {
+ 
+     setError("");
+     setDetailsError("");
++    setSelectedCommit(null);
++    setSelectedRepo("");
+ 
+     // Save the username through Supabase.
+     const saved = await saveUsername(cleanUsername);
+ 
+-    // Stop if saving failed.
++    // Do not continue if saving failed.
+     if (!saved) return;
+ 
+-    // Use the newly saved username as the input value.
+-    setUsernameInputOverride(null);
+-
+-    // Reset the previous repository and commit selection.
+-    setSelectedRepo("");
+-    setCommits([]);
+-    setSelectedCommit(null);
++    // Use the saved username from the profile again.
++    setUsernameEdited(false);
+ 
+-    // Trigger a refresh.
++    // Reload repositories and commits using the saved username.
+     setRefreshKey((previous) => previous + 1);
+   }
+ 
+-  // Refresh the selected repository's commits.
++  // Refresh the currently selected repository's commits.
+   function handleRefresh() {
++    setSelectedCommit(null);
++    setDetailsError("");
+     setRefreshKey((previous) => previous + 1);
+   }
+ 
+@@ -190,7 +220,7 @@ export default function ActivityAuditPage() {
+       return;
+     }
+ 
+-    // Read the owner and repository from the active selection.
++    // Read the owner and repository from the current selection.
+     const [owner, repo] = activeSelectedRepo.split("/");
+ 
+     if (!owner || !repo) return;
+@@ -200,7 +230,7 @@ export default function ActivityAuditPage() {
+     setDetailsLoading(true);
+ 
+     try {
+-      // Fetch the changed files and line statistics.
++      // Fetch the commit's changed files and line statistics.
+       const details = await fetchCommitDetails(
+         owner,
+         repo,
+@@ -219,11 +249,13 @@ export default function ActivityAuditPage() {
+     }
+   }
+ 
+-  // Combine profile and repository loading states.
+-  const profileLoading = usernameLoading || reposLoading;
++  // Show the saved username until the user edits the input.
++  const displayedUsername = usernameEdited
++    ? usernameInput
++    : username;
+ 
+-  // Display the first available profile or repository error.
+-  const profileError = usernameError || reposError;
++  // Combine form and commit request errors.
++  const displayedError = error || commitError;
+ 
+   return (
+     <main className="audit-page">
+@@ -260,10 +292,11 @@ export default function ActivityAuditPage() {
+             <div className="audit-search-row">
+               <input
+                 id="audit-username"
+-                value={usernameInput}
+-                onChange={(event) =>
+-                  setUsernameInputOverride(event.target.value)
+-                }
++                value={displayedUsername}
++                onChange={(event) => {
++                  setUsernameInput(event.target.value);
++                  setUsernameEdited(true);
++                }}
+                 placeholder="Enter GitHub username"
+                 required
+               />
+@@ -284,9 +317,11 @@ export default function ActivityAuditPage() {
+           <select
+             id="audit-repository"
+             value={activeSelectedRepo}
+-            onChange={(event) =>
+-              setSelectedRepo(event.target.value)
+-            }
++            onChange={(event) => {
++              setSelectedRepo(event.target.value);
++              setSelectedCommit(null);
++              setDetailsError("");
++            }}
+             disabled={profileLoading || repositories.length === 0}
+           >
+             <option value="">Select a repository</option>
+@@ -329,9 +364,9 @@ export default function ActivityAuditPage() {
+             </p>
+           )}
+ 
+-          {error && (
++          {displayedError && (
+             <p className="audit-error" role="alert">
+-              {error}
++              {displayedError}
+             </p>
+           )}
+ 
+@@ -350,7 +385,7 @@ export default function ActivityAuditPage() {
+           {!profileLoading &&
+             !loading &&
+             !profileError &&
+-            !error &&
++            !displayedError &&
+             !activeSelectedRepo && (
+               <p className="audit-status">
+                 Save your GitHub username and choose a repository
+@@ -361,7 +396,7 @@ export default function ActivityAuditPage() {
+           {!profileLoading &&
+             !loading &&
+             !profileError &&
+-            !error &&
++            !displayedError &&
+             activeSelectedRepo &&
+             commits.length === 0 && (
+               <p className="audit-status">
+@@ -369,7 +404,7 @@ export default function ActivityAuditPage() {
+               </p>
+             )}
+ 
+-          {!loading && !profileLoading && !error && !profileError && (
++          {!loading && !profileLoading && !displayedError && !profileError && (
+             <div className="audit-timeline">
+               {commits.map((item) => {
+                 // Prefer the GitHub login for the commit author.
+
+
+===== pages/DashboardPage.tsx =====
+warning: in the working copy of 'src/pages/DashboardPage.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/DashboardPage.tsx', LF will be replaced by CRLF the next time Git touches it
+diff --git a/src/pages/DashboardPage.tsx b/frontend/src/pages/DashboardPage.tsx
+index e58f506..d557b43 100644
+--- a/src/pages/DashboardPage.tsx
++++ b/frontend/src/pages/DashboardPage.tsx
+@@ -1,5 +1,4 @@
+-
+-import { useEffect, useState } from "react";
++n++import { useEffect, useState } from "react";
+ import { Link, useNavigate } from "react-router-dom";
+ import {
+   Activity,
+@@ -9,7 +8,6 @@ import {
+   LogOut,
+   RefreshCw,
+   ShieldCheck,
+-  Users,
+   Workflow,
+ } from "lucide-react";
+ 
+@@ -285,15 +283,6 @@ export default function DashboardPage() {
+             <span>Pipelines</span>
+           </Link>
+ 
+-          {/* Navigate to Teams and Workspaces. */}
+-          <Link
+-            to="/teams"
+-            className="dashboard-nav-item"
+-          >
+-            <Users size={19} />
+-            <span>Teams & Workspaces</span>
+-          </Link>
+-
+           <Link
+             to="/activity"
+             className="dashboard-nav-item"
+
+
+===== pages/LoginPage.tsx =====
+warning: in the working copy of 'src/pages/LoginPage.tsx', LF will be replaced by CRLF the next time Git touches it
+
+
+===== pages/PipelinesPage.tsx =====
+warning: in the working copy of 'src/pages/PipelinesPage.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/PipelinesPage.tsx', LF will be replaced by CRLF the next time Git touches it
+diff --git a/src/pages/PipelinesPage.tsx b/frontend/src/pages/PipelinesPage.tsx
+index efeefde..b4d9479 100644
+--- a/src/pages/PipelinesPage.tsx
++++ b/frontend/src/pages/PipelinesPage.tsx
+@@ -1,5 +1,4 @@
+-
+-import { useEffect, useState } from "react";
++n++import { useEffect, useState } from "react";
+ import { Link } from "react-router-dom";
+ import {
+     ArrowLeft,
+@@ -22,6 +21,13 @@ import {
+ 
+ import "../styles/PipelinesPage.css";
+ 
++// Store workflow results with their request key.
++type PipelineResult = {
++    requestKey: string;
++    runs: PipelineRun[];
++    error: string;
++};
++
+ // Return the correct label and style for a workflow run.
+ function getRunStatus(run: PipelineRun) {
+     // Show a running style for workflows that are not completed.
+@@ -69,53 +75,82 @@ export default function PipelinesPage() {
+     // Store the user's repository selection.
+     const [selectedRepo, setSelectedRepo] = useState("");
+ 
+-    // Store the workflow runs returned by GitHub.
+-    const [runs, setRuns] = useState<PipelineRun[]>([]);
+-
+-    // Track workflow loading and error states.
+-    const [loading, setLoading] = useState(false);
+-    const [error, setError] = useState("");
+-
+     // Changing this value triggers a workflow refresh.
+     const [refreshKey, setRefreshKey] = useState(0);
+ 
+-    // Use the selected repository if it still exists.
+-    // Otherwise, automatically use the first available repository.
+-    const activeSelectedRepo = repositories.some(
++    // Store the latest workflow request result.
++    const [pipelineResult, setPipelineResult] =
++        useState<PipelineResult | null>(null);
++
++    // Keep the selected repository if it still exists.
++    const selectedRepositoryExists = repositories.some(
+         (repo) => repo.full_name === selectedRepo
+-    )
++    );
++
++    // Automatically use the first repository when needed.
++    const activeSelectedRepo = selectedRepositoryExists
+         ? selectedRepo
+-        : repositories[0]?.full_name || "";
++        : repositories[0]?.full_name ?? "";
++
++    // Identify the current workflow request.
++    const requestKey = JSON.stringify([
++        activeSelectedRepo,
++        refreshKey,
++    ]);
++
++    // Only use results belonging to the current request.
++    const currentPipelineResult =
++        pipelineResult?.requestKey === requestKey
++            ? pipelineResult
++            : null;
++
++    // Derive workflow runs and errors from the current result.
++    const runs = currentPipelineResult?.runs ?? [];
++    const error = currentPipelineResult?.error ?? "";
++
++    // Combine profile and repository loading states.
++    const profileLoading = usernameLoading || reposLoading;
++
++    // Combine profile and repository errors for display.
++    const profileError = usernameError || reposError;
++
++    // Determine whether workflow data is currently loading.
++    const loading =
++        !profileLoading &&
++        !profileError &&
++        Boolean(username) &&
++        Boolean(activeSelectedRepo) &&
++        !currentPipelineResult;
+ 
+     // Fetch workflows when the selected repository changes.
+     useEffect(() => {
+-        // Do not fetch while the username or repositories are loading.
++        // Wait until the username and repositories have loaded.
+         if (usernameLoading || reposLoading) {
+             return;
+         }
+ 
+         // Do not fetch when the profile has an error.
+-        if (usernameError || reposError) {
++        if (usernameError || reposError || !username) {
+             return;
+         }
+ 
+-        // Do not fetch when no repository is available.
++        // Stop when no repository is available.
+         if (!activeSelectedRepo) {
+             return;
+         }
+ 
++        // Split "owner/repository" into separate values.
++        const [owner, repo] = activeSelectedRepo.split("/");
++
++        if (!owner || !repo) {
++            return;
++        }
++
+         // Create a controller to cancel outdated requests.
+         const controller = new AbortController();
+ 
+         async function loadRuns() {
+-            setLoading(true);
+-            setError("");
+-            setRuns([]);
+-
+             try {
+-                // Split "owner/repository" into separate values.
+-                const [owner, repo] = activeSelectedRepo.split("/");
+-
+                 // Ask GitHub for the repository's workflow runs.
+                 const result = await fetchPipelineRuns(
+                     owner,
+@@ -125,22 +160,26 @@ export default function PipelinesPage() {
+ 
+                 // Ignore results from a cancelled request.
+                 if (!controller.signal.aborted) {
+-                    setRuns(result);
++                    setPipelineResult({
++                        requestKey,
++                        runs: result,
++                        error: "",
++                    });
+                 }
+             } catch (err) {
+                 // Ignore errors from requests that were cancelled.
+-                if (!controller.signal.aborted) {
+-                    setError(
++                if (controller.signal.aborted) {
++                    return;
++                }
++
++                setPipelineResult({
++                    requestKey,
++                    runs: [],
++                    error:
+                         err instanceof Error
+                             ? err.message
+-                            : "Unable to load pipeline runs."
+-                    );
+-                }
+-            } finally {
+-                // Update loading only for the active request.
+-                if (!controller.signal.aborted) {
+-                    setLoading(false);
+-                }
++                            : "Unable to load pipeline runs.",
++                });
+             }
+         }
+ 
+@@ -151,7 +190,8 @@ export default function PipelinesPage() {
+         return () => controller.abort();
+     }, [
+         activeSelectedRepo,
+-        refreshKey,
++        requestKey,
++        username,
+         usernameLoading,
+         usernameError,
+         reposLoading,
+@@ -178,12 +218,6 @@ export default function PipelinesPage() {
+         (run) => run.conclusion === "cancelled"
+     ).length;
+ 
+-    // Wait until the user's GitHub profile has loaded.
+-    const profileLoading = usernameLoading || reposLoading;
+-
+-    // Combine profile and repository errors for display.
+-    const profileError = usernameError || reposError;
+-
+     return (
+         <main className="pipelines-page">
+             <div className="pipelines-container">
+
+
+===== pages/RepositoriesPage.tsx =====
+warning: in the working copy of 'src/pages/RepositoriesPage.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/RepositoriesPage.tsx', LF will be replaced by CRLF the next time Git touches it
+diff --git a/src/pages/RepositoriesPage.tsx b/frontend/src/pages/RepositoriesPage.tsx
+index 49ec998..7b7a02d 100644
+--- a/src/pages/RepositoriesPage.tsx
++++ b/frontend/src/pages/RepositoriesPage.tsx
+@@ -1,9 +1,4 @@
+-
+-import {
+-  useMemo,
+-  useState,
+-  type FormEvent,
+-} from "react";
++import { useMemo, useState, type FormEvent } from "react";
+ 
+ import { Link } from "react-router-dom";
+ 
+@@ -16,18 +11,13 @@ import {
+ } from "lucide-react";
+ 
+ import RepositoryCard from "../components/github/RepositoryCard";
+-
+ import { useGitHubRepositories } from "../hooks/useGitHubRepositories";
+ import { useGitHubUsername } from "../hooks/useGitHubUsername";
+-
+ import "../styles/RepositoriesPage.css";
+ 
+ export default function RepositoriesPage() {
+-  // Store the user's edited username separately from the saved username.
+-  const [inputDraft, setInputDraft] = useState<{
+-    username: string;
+-    value: string;
+-  } | null>(null);
++  // Store a username only when the user edits the input.
++  const [usernameDraft, setUsernameDraft] = useState<string | null>(null);
+ 
+   // Store search and language filter values.
+   const [search, setSearch] = useState("");
+@@ -42,14 +32,8 @@ export default function RepositoriesPage() {
+     saveUsername,
+   } = useGitHubUsername();
+ 
+-  // Show the saved username unless the user has edited the input.
+-  // Ignore an old draft when the saved username changes.
+-  const inputUsername =
+-    inputDraft?.username === username
+-      ? inputDraft.value
+-      : profileLoading
+-        ? ""
+-        : username;
++  // Use the saved username until the user edits the input.
++  const inputUsername = usernameDraft ?? username;
+ 
+   // Do not fetch GitHub data before the profile loads.
+   const activeUsername = profileLoading ? "" : username;
+@@ -64,16 +48,14 @@ export default function RepositoriesPage() {
+   } = useGitHubRepositories(activeUsername);
+ 
+   // Save the entered username to the current user's profile.
+-  async function handleConnect(
+-    event: FormEvent<HTMLFormElement>
+-  ) {
++  async function handleConnect(event: FormEvent<HTMLFormElement>) {
+     // Prevent the browser from reloading the page.
+     event.preventDefault();
+ 
+     // Remove extra spaces from the username.
+     const cleanUsername = inputUsername.trim();
+ 
+-    // Stop if the username is empty.
++    // Stop if the username is empty or the profile is busy.
+     if (!cleanUsername || profileLoading || saving) {
+       return;
+     }
+@@ -86,8 +68,8 @@ export default function RepositoriesPage() {
+       return;
+     }
+ 
+-    // Reset the input draft after saving.
+-    setInputDraft(null);
++    // Keep the saved username in the input.
++    setUsernameDraft(cleanUsername);
+ 
+     // Reset search and language filters.
+     setSearch("");
+@@ -103,9 +85,7 @@ export default function RepositoriesPage() {
+   const languages = useMemo(() => {
+     const values = repositories
+       .map((repository) => repository.language)
+-      .filter(
+-        (value): value is string => Boolean(value)
+-      );
++      .filter((value): value is string => Boolean(value));
+ 
+     return [...new Set(values)].sort();
+   }, [repositories]);
+@@ -118,14 +98,11 @@ export default function RepositoriesPage() {
+       // Match repository name or description.
+       const matchesSearch =
+         repository.name.toLowerCase().includes(query) ||
+-        (repository.description || "")
+-          .toLowerCase()
+-          .includes(query);
++        (repository.description || "").toLowerCase().includes(query);
+ 
+       // Match the selected programming language.
+       const matchesLanguage =
+-        language === "all" ||
+-        repository.language === language;
++        language === "all" || repository.language === language;
+ 
+       return matchesSearch && matchesLanguage;
+     });
+@@ -140,12 +117,8 @@ export default function RepositoriesPage() {
+   return (
+     <main className="repositories-page">
+       <div className="repositories-container">
+-
+         {/* Back navigation */}
+-        <Link
+-          to="/dashboard"
+-          className="repositories-back"
+-        >
++        <Link to="/dashboard" className="repositories-back">
+           <ArrowLeft size={17} />
+           Back to dashboard
+         </Link>
+@@ -176,8 +149,7 @@ export default function RepositoriesPage() {
+             <h2>Explore GitHub repositories</h2>
+ 
+             <p>
+-              Enter a GitHub username to fetch public
+-              repositories.
++              Enter a GitHub username to fetch public repositories.
+             </p>
+           </div>
+ 
+@@ -197,12 +169,7 @@ export default function RepositoriesPage() {
+               type="text"
+               placeholder="Enter GitHub username"
+               value={inputUsername}
+-              onChange={(event) =>
+-                setInputDraft({
+-                  username,
+-                  value: event.target.value,
+-                })
+-              }
++              onChange={(event) => setUsernameDraft(event.target.value)}
+               disabled={profileLoading || saving}
+               required
+               pattern="[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?"
+@@ -210,15 +177,9 @@ export default function RepositoriesPage() {
+             />
+ 
+             {/* Save username and load repositories */}
+-            <button
+-              type="submit"
+-              disabled={isLoading || saving}
+-            >
++            <button type="submit" disabled={isLoading || saving}>
+               {isLoading || saving ? (
+-                <RefreshCw
+-                  size={18}
+-                  className="repo-spin"
+-                />
++                <RefreshCw size={18} className="repo-spin" />
+               ) : (
+                 <GitBranch size={18} />
+               )}
+@@ -240,10 +201,7 @@ export default function RepositoriesPage() {
+ 
+         {/* Show database or GitHub API errors */}
+         {displayError && (
+-          <div
+-            className="repositories-error"
+-            role="alert"
+-          >
++          <div className="repositories-error" role="alert">
+             <AlertCircle size={20} />
+             <span>{displayError}</span>
+           </div>
+@@ -251,14 +209,8 @@ export default function RepositoriesPage() {
+ 
+         {/* Loading state */}
+         {isLoading && (
+-          <div
+-            className="repositories-status"
+-            role="status"
+-          >
+-            <RefreshCw
+-              size={23}
+-              className="repo-spin"
+-            />
++          <div className="repositories-status" role="status">
++            <RefreshCw size={23} className="repo-spin" />
+ 
+             <p>
+               {profileLoading
+@@ -308,28 +260,19 @@ export default function RepositoriesPage() {
+                   placeholder="Search repositories..."
+                   aria-label="Search repositories"
+                   value={search}
+-                  onChange={(event) =>
+-                    setSearch(event.target.value)
+-                  }
++                  onChange={(event) => setSearch(event.target.value)}
+                 />
+               </div>
+ 
+               <select
+                 aria-label="Filter by language"
+                 value={language}
+-                onChange={(event) =>
+-                  setLanguage(event.target.value)
+-                }
++                onChange={(event) => setLanguage(event.target.value)}
+               >
+-                <option value="all">
+-                  All languages
+-                </option>
++                <option value="all">All languages</option>
+ 
+                 {languages.map((item) => (
+-                  <option
+-                    key={item}
+-                    value={item}
+-                  >
++                  <option key={item} value={item}>
+                     {item}
+                   </option>
+                 ))}
+
+
+===== pages/SignupPage.tsx =====
+warning: in the working copy of 'src/pages/SignupPage.tsx', LF will be replaced by CRLF the next time Git touches it
+
+
+===== pages/TeamsPage.tsx =====
+warning: in the working copy of 'src/pages/TeamsPage.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/TeamsPage.tsx', LF will be replaced by CRLF the next time Git touches it
+diff --git a/src/pages/TeamsPage.tsx b/frontend/src/pages/TeamsPage.tsx
+index 989f231..3cd5224 100644
+--- a/src/pages/TeamsPage.tsx
++++ b/frontend/src/pages/TeamsPage.tsx
+@@ -1,5 +1,11 @@
+ 
+-import { useEffect, useMemo, useState, type FormEvent } from "react";
++import {
++  useCallback,
++  useEffect,
++  useMemo,
++  useState,
++  type FormEvent,
++} from "react";
+ import { Link } from "react-router-dom";
+ import {
+   ArrowLeft,
+@@ -15,14 +21,14 @@ import {
+   X,
+ } from "lucide-react";
+ 
++import { supabase } from "../lib/supabase";
+ import "../styles/TeamsPage.css";
+ 
+-// Available workspace roles.
+ type TeamRole = "Owner" | "Admin" | "Member";
+ 
+-// Information stored for each team member.
+ type TeamMember = {
+-  id: number;
++  id: string;
++  userId: string;
+   name: string;
+   email: string;
+   initials: string;
+@@ -30,153 +36,62 @@ type TeamMember = {
+   color: string;
+ };
+ 
+-// Information stored for each workspace.
+ type Team = {
+-  id: number;
++  id: string;
+   name: string;
+   description: string;
+   initials: string;
+   color: string;
+   members: TeamMember[];
+   projects: number;
++  myRole: TeamRole;
+ };
+ 
+-// Sample data for the UI preview.
+-// This data is not saved to Supabase.
+-const initialTeams: Team[] = [
+-  {
+-    id: 1,
+-    name: "Platform Engineering",
+-    description: "Core infrastructure, CI/CD and developer experience.",
+-    initials: "PE",
+-    color: "lavender",
+-    projects: 8,
+-    members: [
+-      {
+-        id: 1,
+-        name: "Aishwarya Pawar",
+-        email: "you@example.com",
+-        initials: "AP",
+-        role: "Owner",
+-        color: "purple",
+-      },
+-      {
+-        id: 2,
+-        name: "Rohan Kulkarni",
+-        email: "rohan@example.com",
+-        initials: "RK",
+-        role: "Admin",
+-        color: "blue",
+-      },
+-      {
+-        id: 3,
+-        name: "Neha Shah",
+-        email: "neha@example.com",
+-        initials: "NS",
+-        role: "Member",
+-        color: "peach",
+-      },
+-    ],
+-  },
+-  {
+-    id: 2,
+-    name: "Client Delivery",
+-    description:
+-      "Deployment health and delivery workflows for client projects.",
+-    initials: "CD",
+-    color: "mint",
+-    projects: 5,
+-    members: [
+-      {
+-        id: 1,
+-        name: "Aishwarya Pawar",
+-        email: "you@example.com",
+-        initials: "AP",
+-        role: "Owner",
+-        color: "purple",
+-      },
+-      {
+-        id: 4,
+-        name: "Arjun Deshmukh",
+-        email: "arjun@example.com",
+-        initials: "AD",
+-        role: "Member",
+-        color: "green",
+-      },
+-    ],
+-  },
+-  {
+-    id: 3,
+-    name: "Product & QA",
+-    description: "Release readiness, test automation and product quality.",
+-    initials: "PQ",
+-    color: "peach",
+-    projects: 3,
+-    members: [
+-      {
+-        id: 1,
+-        name: "Aishwarya Pawar",
+-        email: "you@example.com",
+-        initials: "AP",
+-        role: "Owner",
+-        color: "purple",
+-      },
+-      {
+-        id: 5,
+-        name: "Mira Joshi",
+-        email: "mira@example.com",
+-        initials: "MJ",
+-        role: "Member",
+-        color: "blue",
+-      },
+-      {
+-        id: 6,
+-        name: "Dev Patel",
+-        email: "dev@example.com",
+-        initials: "DP",
+-        role: "Member",
+-        color: "green",
+-      },
+-      {
+-        id: 7,
+-        name: "Sara Khan",
+-        email: "sara@example.com",
+-        initials: "SK",
+-        role: "Admin",
+-        color: "peach",
+-      },
+-    ],
+-  },
+-];
++const colors = ["lavender", "mint", "peach", "blue"];
++
++// Generate initials for a workspace or member.
++function getInitials(value: string) {
++  return (
++    value
++      .trim()
++      .split(/\s+/)
++      .slice(0, 2)
++      .map((part) => part[0])
++      .join("")
++      .toUpperCase() || "TM"
++  );
++}
++
++// Convert database roles into UI roles.
++function mapRole(role: string): TeamRole {
++  if (role === "owner") return "Owner";
++  if (role === "admin") return "Admin";
++  return "Member";
++}
+ 
+ export default function TeamsPage() {
+-  // Store workspace data in React state.
+-  const [teams, setTeams] = useState<Team[]>(initialTeams);
++  // Actual workspace data loaded from Supabase.
++  const [teams, setTeams] = useState<Team[]>([]);
+ 
+-  // Track the currently selected workspace.
+-  const [activeTeamId, setActiveTeamId] = useState(1);
++  // Currently selected workspace.
++  const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
+ 
+-  // Search and filter state.
+-  const [search, setSearch] = useState("");
++  // Independent search and filter states.
++  const [workspaceSearch, setWorkspaceSearch] = useState("");
++  const [memberSearch, setMemberSearch] = useState("");
+   const [roleFilter, setRoleFilter] = useState("All roles");
+ 
+-  // Control the create and invite forms.
++  // Create workspace form state.
+   const [showCreateForm, setShowCreateForm] = useState(false);
+-  const [showInviteForm, setShowInviteForm] = useState(false);
+-
+-  // Create workspace form values.
+   const [teamName, setTeamName] = useState("");
+   const [teamDescription, setTeamDescription] = useState("");
+ 
+-  // Invite member form values.
+-  const [inviteEmail, setInviteEmail] = useState("");
+-  const [inviteRole, setInviteRole] =
+-    useState<"Admin" | "Member">("Member");
+-
+-  // Temporary notification message.
++  // Loading and notification states.
+   const [notice, setNotice] = useState("");
++  const [loading, setLoading] = useState(true);
++  const [creating, setCreating] = useState(false);
+ 
+-  // Automatically hide notifications after 3.5 seconds.
++  // Automatically hide notifications.
+   useEffect(() => {
+     if (!notice) return;
+ 
+@@ -187,169 +102,282 @@ export default function TeamsPage() {
+     return () => window.clearTimeout(timeoutId);
+   }, [notice]);
+ 
++  // Load workspaces and their related database records.
++  const loadTeams = useCallback(async () => {
++    setLoading(true);
++
++    try {
++      // Get the currently authenticated user.
++      const {
++        data: { user },
++        error: authError,
++      } = await supabase.auth.getUser();
++
++      if (authError) throw authError;
++
++      if (!user) {
++        setTeams([]);
++        setActiveTeamId(null);
++        setNotice("Please sign in to view your workspaces.");
++        return;
++      }
++
++      // Read the current user's profile.
++      const { data: profile, error: profileError } = await supabase
++        .from("profiles")
++        .select("display_name")
++        .eq("id", user.id)
++        .maybeSingle();
++
++      if (profileError) throw profileError;
++
++      const currentName =
++        profile?.display_name ||
++        user.user_metadata?.full_name ||
++        user.email?.split("@")[0] ||
++        "You";
++
++      // Fetch workspaces visible to the current user.
++      const { data: teamRows, error: teamsError } = await supabase
++        .from("teams")
++        .select("id, name, description, owner_id, created_at")
++        .order("created_at", { ascending: false });
++
++      if (teamsError) throw teamsError;
++
++      const rows = teamRows ?? [];
++
++      // Clear the page when the user has no workspaces.
++      if (rows.length === 0) {
++        setTeams([]);
++        setActiveTeamId(null);
++        return;
++      }
++
++      const teamIds = rows.map((team) => team.id);
++
++      // Fetch actual memberships.
++      const { data: memberRows, error: membersError } = await supabase
++        .from("team_members")
++        .select("id, team_id, user_id, role")
++        .in("team_id", teamIds);
++
++      if (membersError) throw membersError;
++
++      // Fetch actual projects.
++      const { data: projectRows, error: projectsError } = await supabase
++        .from("team_projects")
++        .select("id, team_id")
++        .in("team_id", teamIds);
++
++      if (projectsError) throw projectsError;
++
++      const memberships = memberRows ?? [];
++      const projects = projectRows ?? [];
++
++      // Convert database records into the UI data structure.
++      const mappedTeams: Team[] = rows.map((team, index) => {
++        const teamMembers = memberships.filter(
++          (member) => member.team_id === team.id,
++        );
++
++        const currentMembership = teamMembers.find(
++          (member) => member.user_id === user.id,
++        );
++
++        const members: TeamMember[] = teamMembers.map(
++          (member, memberIndex) => {
++            const isCurrentUser = member.user_id === user.id;
++
++            // Do not invent private profile details for other users.
++            const displayName = isCurrentUser
++              ? currentName
++              : "Team member";
++
++            return {
++              id: member.id,
++              userId: member.user_id,
++              name: displayName,
++              email: isCurrentUser ? user.email ?? "" : "",
++              initials: getInitials(displayName),
++              role: mapRole(member.role),
++              color: isCurrentUser
++                ? "purple"
++                : colors[memberIndex % colors.length],
++            };
++          },
++        );
++
++        return {
++          id: team.id,
++          name: team.name,
++          description:
++            team.description || "No workspace description added.",
++          initials: getInitials(team.name),
++          color: colors[index % colors.length],
++          members,
++          projects: projects.filter(
++            (project) => project.team_id === team.id,
++          ).length,
++          myRole: currentMembership
++            ? mapRole(currentMembership.role)
++            : team.owner_id === user.id
++              ? "Owner"
++              : "Member",
++        };
++      });
++
++      setTeams(mappedTeams);
++
++      // Preserve the selected workspace when it still exists.
++      setActiveTeamId((currentId) => {
++        if (
++          currentId &&
++          mappedTeams.some((team) => team.id === currentId)
++        ) {
++          return currentId;
++        }
++
++        return mappedTeams[0]?.id ?? null;
++      });
++    } catch (error) {
++      console.error("Workspace loading failed:", error);
++
++      setNotice(
++        error instanceof Error
++          ? error.message
++          : "Unable to load workspaces.",
++      );
++    } finally {
++      setLoading(false);
++    }
++  }, []);
++
++  // Schedule the initial workspace load after the component mounts.
++  // This avoids synchronously triggering state updates inside the effect.
++  useEffect(() => {
++    const timeoutId = window.setTimeout(() => {
++      void loadTeams();
++    }, 0);
++
++    return () => window.clearTimeout(timeoutId);
++  }, [loadTeams]);
++
+   // Find the selected workspace.
+   const activeTeam =
+-    teams.find((team) => team.id === activeTeamId) ?? teams[0];
++    teams.find((team) => team.id === activeTeamId) ?? null;
+ 
+-  // Search workspaces by name or description.
++  // Search workspaces independently.
+   const filteredTeams = useMemo(
+     () =>
+       teams.filter((team) =>
+         `${team.name} ${team.description}`
+           .toLowerCase()
+-          .includes(search.toLowerCase()),
++          .includes(workspaceSearch.toLowerCase()),
+       ),
+-    [teams, search],
++    [teams, workspaceSearch],
+   );
+ 
+   // Search and filter members in the selected workspace.
+-  const filteredMembers = activeTeam.members.filter(
+-    (member) =>
+-      `${member.name} ${member.email}`
++  const filteredMembers = useMemo(() => {
++    if (!activeTeam) return [];
++
++    return activeTeam.members.filter((member) => {
++      const matchesSearch = `${member.name} ${member.email}`
+         .toLowerCase()
+-        .includes(search.toLowerCase()) &&
+-      (roleFilter === "All roles" || member.role === roleFilter),
+-  );
++        .includes(memberSearch.toLowerCase());
++
++      const matchesRole =
++        roleFilter === "All roles" || member.role === roleFilter;
++
++      return matchesSearch && matchesRole;
++    });
++  }, [activeTeam, memberSearch, roleFilter]);
+ 
+-  // Count unique member IDs across all workspaces.
++  // Count unique members across all workspaces.
+   const totalMembers = new Set(
+-    teams.flatMap((team) => team.members.map((member) => member.id)),
++    teams.flatMap((team) => team.members.map((member) => member.userId)),
+   ).size;
+ 
+-  // Count projects across all workspaces.
++  // Count actual projects across all workspaces.
+   const totalProjects = teams.reduce(
+     (sum, team) => sum + team.projects,
+     0,
+   );
+ 
+-  // Create a workspace in the local preview.
+-  function handleCreateTeam(event: FormEvent<HTMLFormElement>) {
++  // Create a workspace in Supabase.
++  async function handleCreateTeam(event: FormEvent<HTMLFormElement>) {
+     event.preventDefault();
+ 
+     const cleanName = teamName.trim();
++    const cleanDescription = teamDescription.trim();
+ 
+     if (!cleanName) {
+       setNotice("Please enter a workspace name.");
+       return;
+     }
+ 
+-    // Prevent duplicate workspace names.
+-    const alreadyExists = teams.some(
++    // Prevent duplicate workspace names in the current list.
++    const duplicate = teams.some(
+       (team) => team.name.toLowerCase() === cleanName.toLowerCase(),
+     );
+ 
+-    if (alreadyExists) {
++    if (duplicate) {
+       setNotice("A workspace with this name already exists.");
+       return;
+     }
+ 
+-    const newTeam: Team = {
+-      id: Date.now(),
+-      name: cleanName,
+-      description:
+-        teamDescription.trim() ||
+-        "A new workspace for your team's projects.",
+-      initials: cleanName
+-        .split(/\s+/)
+-        .slice(0, 2)
+-        .map((part) => part[0])
+-        .join("")
+-        .toUpperCase(),
+-      color: "lavender",
+-      projects: 0,
+-      members: [
+-        {
+-          id: Date.now() + 1,
+-          name: "Aishwarya Pawar",
+-          email: "you@example.com",
+-          initials: "AP",
+-          role: "Owner",
+-          color: "purple",
+-        },
+-      ],
+-    };
+-
+-    setTeams((current) => [newTeam, ...current]);
+-    setActiveTeamId(newTeam.id);
+-    setTeamName("");
+-    setTeamDescription("");
+-    setSearch("");
+-    setRoleFilter("All roles");
+-    setShowCreateForm(false);
+-    setShowInviteForm(false);
+-    setNotice(`"${cleanName}" was added to the local preview.`);
+-  }
+-
+-  // Open the invite form and clear old input.
+-  function handleOpenInviteForm() {
+-    setInviteEmail("");
+-    setInviteRole("Member");
+-    setShowInviteForm(true);
+-    setNotice("");
+-  }
+-
+-  // Add a member to the selected workspace preview.
+-  function handleInviteMember(event: FormEvent<HTMLFormElement>) {
+-    event.preventDefault();
+-
+-    const cleanEmail = inviteEmail.trim().toLowerCase();
+-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+-
+-    // Validate the email address.
+-    if (!emailPattern.test(cleanEmail)) {
+-      setNotice("Please enter a valid email address.");
+-      return;
++    setCreating(true);
++
++    try {
++      // Verify the authenticated user.
++      const {
++        data: { user },
++        error: authError,
++      } = await supabase.auth.getUser();
++
++      if (authError) throw authError;
++
++      if (!user) {
++        throw new Error("Please sign in before creating a workspace.");
++      }
++
++      // Save the workspace in the database.
++      const { data, error } = await supabase
++        .from("teams")
++        .insert({
++          name: cleanName,
++          description: cleanDescription || null,
++          owner_id: user.id,
++        })
++        .select("id")
++        .single();
++
++      if (error) throw error;
++
++      // The database trigger creates the owner's membership.
++      await loadTeams();
++
++      setActiveTeamId(data.id);
++      setTeamName("");
++      setTeamDescription("");
++      setWorkspaceSearch("");
++      setMemberSearch("");
++      setRoleFilter("All roles");
++      setShowCreateForm(false);
++
++      setNotice(`"${cleanName}" workspace created successfully.`);
++    } catch (error) {
++      console.error("Workspace creation failed:", error);
++
++      setNotice(
++        error instanceof Error
++          ? error.message
++          : "Unable to create workspace.",
++      );
++    } finally {
++      setCreating(false);
+     }
+-
+-    // Check whether this email already exists in the workspace.
+-    const alreadyMember = activeTeam.members.some(
+-      (member) => member.email.toLowerCase() === cleanEmail,
+-    );
+-
+-    if (alreadyMember) {
+-      setNotice("This email already belongs to the selected workspace.");
+-      return;
+-    }
+-
+-    // Generate a display name from the email address.
+-    const emailName = cleanEmail.split("@")[0];
+-    const displayName = emailName
+-      .replace(/[._-]+/g, " ")
+-      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+-
+-    const initials =
+-      displayName
+-        .split(/\s+/)
+-        .slice(0, 2)
+-        .map((part) => part[0])
+-        .join("")
+-        .toUpperCase() || "TM";
+-
+-    const newMember: TeamMember = {
+-      id: Date.now(),
+-      name: displayName,
+-      email: cleanEmail,
+-      initials,
+-      role: inviteRole,
+-      color: "blue",
+-    };
+-
+-    // Update only the selected workspace.
+-    setTeams((currentTeams) =>
+-      currentTeams.map((team) =>
+-        team.id === activeTeamId
+-          ? { ...team, members: [...team.members, newMember] }
+-          : team,
+-      ),
+-    );
+-
+-    setInviteEmail("");
+-    setInviteRole("Member");
+-    setShowInviteForm(false);
+-
+-    setNotice(
+-      `${cleanEmail} was added as ${inviteRole}. No email was sent.`,
+-    );
+   }
+ 
+   return (
+@@ -388,11 +416,10 @@ export default function TeamsPage() {
+           </button>
+         </header>
+ 
+-        {/* Temporary toast notification */}
++        {/* Notification */}
+         {notice && (
+           <div className="teams-toast" role="status">
+             <Check size={18} />
+-
+             <span>{notice}</span>
+ 
+             <button
+@@ -431,6 +458,7 @@ export default function TeamsPage() {
+             <form className="teams-create-form" onSubmit={handleCreateTeam}>
+               <label>
+                 Team name <span aria-hidden="true">*</span>
++
+                 <input
+                   autoFocus
+                   maxLength={60}
+@@ -444,6 +472,7 @@ export default function TeamsPage() {
+               <label>
+                 Description{" "}
+                 <span className="teams-optional">(optional)</span>
++
+                 <input
+                   maxLength={140}
+                   value={teamDescription}
+@@ -463,16 +492,20 @@ export default function TeamsPage() {
+                   Cancel
+                 </button>
+ 
+-                <button className="teams-primary-button" type="submit">
++                <button
++                  className="teams-primary-button"
++                  type="submit"
++                  disabled={creating}
++                >
+                   <Plus size={17} />
+-                  Create preview team
++                  {creating ? "Creating..." : "Create workspace"}
+                 </button>
+               </div>
+             </form>
+           </section>
+         )}
+ 
+-        {/* Compact workspace summary */}
++        {/* Workspace summary */}
+         <section className="teams-metrics" aria-label="Workspace summary">
+           <article className="teams-metric-card">
+             <span className="teams-metric-icon purple">
+@@ -481,7 +514,7 @@ export default function TeamsPage() {
+ 
+             <div>
+               <p>Workspaces</p>
+-              <strong>{teams.length}</strong>
++              <strong>{loading ? "GÇö" : teams.length}</strong>
+             </div>
+ 
+             <span className="teams-metric-caption">
+@@ -496,7 +529,7 @@ export default function TeamsPage() {
+ 
+             <div>
+               <p>Unique members</p>
+-              <strong>{totalMembers}</strong>
++              <strong>{loading ? "GÇö" : totalMembers}</strong>
+             </div>
+ 
+             <span className="teams-metric-caption">
+@@ -511,11 +544,11 @@ export default function TeamsPage() {
+ 
+             <div>
+               <p>Projects</p>
+-              <strong>{totalProjects}</strong>
++              <strong>{loading ? "GÇö" : totalProjects}</strong>
+             </div>
+ 
+             <span className="teams-metric-caption">
+-              Sample workspace data
++              Saved workspace projects
+             </span>
+           </article>
+         </section>
+@@ -539,53 +572,73 @@ export default function TeamsPage() {
+               <span className="teams-sr-only">Search workspaces</span>
+ 
+               <input
+-                value={search}
+-                onChange={(event) => setSearch(event.target.value)}
+-                placeholder="Search workspaces or members"
++                value={workspaceSearch}
++                onChange={(event) =>
++                  setWorkspaceSearch(event.target.value)
++                }
++                placeholder="Search workspaces"
+               />
+             </label>
+ 
+             <div className="teams-list">
+-              {filteredTeams.map((team) => (
+-                <button
+-                  type="button"
+-                  key={team.id}
+-                  className={`teams-list-item ${
+-                    activeTeamId === team.id ? "selected" : ""
+-                  }`}
+-                  onClick={() => {
+-                    setActiveTeamId(team.id);
+-                    setRoleFilter("All roles");
+-                    setShowInviteForm(false);
+-                    setNotice("");
+-                  }}
+-                >
+-                  <span
+-                    className={`teams-avatar teams-avatar-${team.color}`}
+-                  >
+-                    {team.initials}
+-                  </span>
+-
+-                  <span className="teams-list-copy">
+-                    <strong>{team.name}</strong>
+-                    <small>
+-                      {team.members.length} members -+ {team.projects} projects
+-                    </small>
+-                  </span>
+-
+-                  <ChevronRight
+-                    className="teams-list-chevron"
+-                    size={18}
+-                  />
+-                </button>
+-              ))}
+-
+-              {filteredTeams.length === 0 && (
++              {loading ? (
+                 <div className="teams-empty">
+-                  <Search size={23} />
+-                  <strong>No workspaces found</strong>
+-                  <span>Try another search term.</span>
++                  <span>Loading workspaces...</span>
+                 </div>
++              ) : (
++                <>
++                  {filteredTeams.map((team) => (
++                    <button
++                      type="button"
++                      key={team.id}
++                      className={`teams-list-item ${
++                        activeTeamId === team.id ? "selected" : ""
++                      }`}
++                      onClick={() => {
++                        setActiveTeamId(team.id);
++                        setRoleFilter("All roles");
++                        setMemberSearch("");
++                      }}
++                    >
++                      <span
++                        className={`teams-avatar teams-avatar-${team.color}`}
++                      >
++                        {team.initials}
++                      </span>
++
++                      <span className="teams-list-copy">
++                        <strong>{team.name}</strong>
++
++                        <small>
++                          {team.members.length} members -+ {team.projects} projects
++                        </small>
++                      </span>
++
++                      <ChevronRight
++                        className="teams-list-chevron"
++                        size={18}
++                      />
++                    </button>
++                  ))}
++
++                  {filteredTeams.length === 0 && (
++                    <div className="teams-empty">
++                      <Search size={23} />
++
++                      <strong>
++                        {teams.length === 0
++                          ? "No workspaces yet"
++                          : "No workspaces found"}
++                      </strong>
++
++                      <span>
++                        {teams.length === 0
++                          ? "Create your first workspace to get started."
++                          : "Try another search term."}
++                      </span>
++                    </div>
++                  )}
++                </>
+               )}
+             </div>
+ 
+@@ -604,258 +657,214 @@ export default function TeamsPage() {
+ 
+           {/* Selected workspace details */}
+           <section className="teams-panel teams-detail-panel">
+-            <div className="teams-detail-top">
+-              <span
+-                className={`teams-avatar teams-avatar-${activeTeam.color} teams-avatar-large`}
+-              >
+-                {activeTeam.initials}
+-              </span>
+-
+-              <div className="teams-detail-title">
+-                <p className="teams-detail-label">WORKSPACE DETAILS</p>
+-
+-                <h2>{activeTeam.name}</h2>
+-
+-                <p>{activeTeam.description}</p>
+-              </div>
+-
+-              <button
+-                className="teams-icon-button"
+-                type="button"
+-                title="Workspace settings are coming soon"
+-                aria-label="Workspace settings (coming soon)"
+-                onClick={() =>
+-                  setNotice(
+-                    "Workspace settings will be available in a later update.",
+-                  )
+-                }
+-              >
+-                <ShieldCheck size={19} />
+-              </button>
+-            </div>
+-
+-            {/* Selected workspace statistics */}
+-            <div className="teams-detail-stats">
+-              <div>
+-                <span>Members</span>
+-                <strong>{activeTeam.members.length}</strong>
+-              </div>
+-
+-              <div>
+-                <span>Projects</span>
+-                <strong>{activeTeam.projects}</strong>
+-              </div>
+-
+-              <div>
+-                <span>Your role</span>
+-                <strong>Owner</strong>
+-              </div>
+-            </div>
++            {activeTeam ? (
++              <>
++                <div className="teams-detail-top">
++                  <span
++                    className={`teams-avatar teams-avatar-${activeTeam.color} teams-avatar-large`}
++                  >
++                    {activeTeam.initials}
++                  </span>
+ 
+-            {/* Members heading */}
+-            <div className="teams-members-heading">
+-              <div>
+-                <h3>Team members</h3>
+-                <p>People with access to this workspace</p>
+-              </div>
++                  <div className="teams-detail-title">
++                    <p className="teams-detail-label">
++                      WORKSPACE DETAILS
++                    </p>
+ 
+-              <span className="teams-count-pill">
+-                {filteredMembers.length}
+-              </span>
+-            </div>
++                    <h2>{activeTeam.name}</h2>
++                    <p>{activeTeam.description}</p>
++                  </div>
+ 
+-            {/* Member search and role filter */}
+-            <div className="teams-member-toolbar">
+-              <label className="teams-member-search">
+-                <Search size={15} />
+-                <span className="teams-sr-only">Search team members</span>
++                  <button
++                    className="teams-icon-button"
++                    type="button"
++                    title="Workspace settings are coming soon"
++                    aria-label="Workspace settings (coming soon)"
++                    onClick={() =>
++                      setNotice(
++                        "Workspace settings will be available in a later update.",
++                      )
++                    }
++                  >
++                    <ShieldCheck size={19} />
++                  </button>
++                </div>
+ 
+-                <input
+-                  value={search}
+-                  onChange={(event) => setSearch(event.target.value)}
+-                  placeholder="Search members"
+-                />
+-              </label>
++                {/* Workspace statistics */}
++                <div className="teams-detail-stats">
++                  <div>
++                    <span>Members</span>
++                    <strong>{activeTeam.members.length}</strong>
++                  </div>
+ 
+-              <label className="teams-role-filter">
+-                <span className="teams-sr-only">Filter by role</span>
++                  <div>
++                    <span>Projects</span>
++                    <strong>{activeTeam.projects}</strong>
++                  </div>
+ 
+-                <select
+-                  value={roleFilter}
+-                  onChange={(event) => setRoleFilter(event.target.value)}
+-                >
+-                  <option>All roles</option>
+-                  <option>Owner</option>
+-                  <option>Admin</option>
+-                  <option>Member</option>
+-                </select>
+-              </label>
+-            </div>
++                  <div>
++                    <span>Your role</span>
++                    <strong>{activeTeam.myRole}</strong>
++                  </div>
++                </div>
+ 
+-            {/* Invite member form appears only when requested */}
+-            {showInviteForm && (
+-              <section
+-                className="teams-create-panel"
+-                aria-labelledby="invite-member-title"
+-              >
+-                <div className="teams-create-heading">
++                {/* Members heading */}
++                <div className="teams-members-heading">
+                   <div>
+-                    <h2 id="invite-member-title">Add a team member</h2>
+-                    <p>Enter an email address and select a role.</p>
++                    <h3>Team members</h3>
++                    <p>People with access to this workspace</p>
+                   </div>
+ 
+-                  <button
+-                    className="teams-icon-button"
+-                    type="button"
+-                    aria-label="Close invitation form"
+-                    onClick={() => setShowInviteForm(false)}
+-                  >
+-                    <X size={19} />
+-                  </button>
++                  <span className="teams-count-pill">
++                    {filteredMembers.length}
++                  </span>
+                 </div>
+ 
+-                <form
+-                  className="teams-create-form"
+-                  onSubmit={handleInviteMember}
+-                >
+-                  <label>
+-                    Email address <span aria-hidden="true">*</span>
++                {/* Member search and role filter */}
++                <div className="teams-member-toolbar">
++                  <label className="teams-member-search">
++                    <Search size={15} />
++
++                    <span className="teams-sr-only">
++                      Search team members
++                    </span>
+ 
+                     <input
+-                      type="email"
+-                      autoFocus
+-                      required
+-                      maxLength={254}
+-                      value={inviteEmail}
++                      value={memberSearch}
+                       onChange={(event) =>
+-                        setInviteEmail(event.target.value)
++                        setMemberSearch(event.target.value)
+                       }
+-                      placeholder="name@company.com"
++                      placeholder="Search members"
+                     />
+                   </label>
+ 
+-                  <label>
+-                    Workspace role
++                  <label className="teams-role-filter">
++                    <span className="teams-sr-only">
++                      Filter by role
++                    </span>
+ 
+                     <select
+-                      value={inviteRole}
++                      value={roleFilter}
+                       onChange={(event) =>
+-                        setInviteRole(event.target.value as "Admin" | "Member")
++                        setRoleFilter(event.target.value)
+                       }
+                     >
+-                      <option value="Member">Member</option>
+-                      <option value="Admin">Admin</option>
++                      <option>All roles</option>
++                      <option>Owner</option>
++                      <option>Admin</option>
++                      <option>Member</option>
+                     </select>
+                   </label>
++                </div>
+ 
+-                  <div className="teams-form-actions">
+-                    <button
+-                      className="teams-secondary-button"
+-                      type="button"
+-                      onClick={() => setShowInviteForm(false)}
+-                    >
+-                      Cancel
+-                    </button>
+-
+-                    <button
+-                      className="teams-primary-button"
+-                      type="submit"
+-                    >
+-                      <Plus size={17} />
+-                      Add member
+-                    </button>
+-                  </div>
+-                </form>
+-              </section>
+-            )}
+-
+-            {/* Members table */}
+-            <div className="teams-table-wrap">
+-              <table className="teams-members-table">
+-                <thead>
+-                  <tr>
+-                    <th>Member</th>
+-                    <th>Role</th>
+-                    <th>Access</th>
+-                  </tr>
+-                </thead>
+-
+-                <tbody>
+-                  {filteredMembers.map((member) => (
+-                    <tr key={`${activeTeam.id}-${member.id}`}>
+-                      <td>
+-                        <div className="teams-member-cell">
+-                          <span
+-                            className={`teams-member-avatar ${member.color}`}
+-                          >
+-                            {member.initials}
+-                          </span>
+-
+-                          <span>
+-                            <strong>{member.name}</strong>
+-                            <small>{member.email}</small>
+-                          </span>
+-                        </div>
+-                      </td>
+-
+-                      <td>
+-                        <span
+-                          className={`teams-role-badge ${member.role.toLowerCase()}`}
+-                        >
+-                          {member.role === "Owner" && <Crown size={12} />}
+-                          {member.role}
+-                        </span>
+-                      </td>
+-
+-                      <td>
+-                        <span className="teams-access-status">
+-                          <Check size={14} />
+-                          Active
+-                        </span>
+-                      </td>
+-                    </tr>
+-                  ))}
+-                </tbody>
+-              </table>
+-
+-              {filteredMembers.length === 0 && (
+-                <div className="teams-empty teams-member-empty">
+-                  <Users size={22} />
+-                  <strong>No members match</strong>
+-                  <span>Change the search or role filter.</span>
++                {/* Members table */}
++                <div className="teams-table-wrap">
++                  <table className="teams-members-table">
++                    <thead>
++                      <tr>
++                        <th>Member</th>
++                        <th>Role</th>
++                        <th>Access</th>
++                      </tr>
++                    </thead>
++
++                    <tbody>
++                      {filteredMembers.map((member) => (
++                        <tr key={member.id}>
++                          <td>
++                            <div className="teams-member-cell">
++                              <span
++                                className={`teams-member-avatar ${member.color}`}
++                              >
++                                {member.initials}
++                              </span>
++
++                              <span>
++                                <strong>{member.name}</strong>
++
++                                <small>
++                                  {member.email ||
++                                    "Profile details unavailable"}
++                                </small>
++                              </span>
++                            </div>
++                          </td>
++
++                          <td>
++                            <span
++                              className={`teams-role-badge ${member.role.toLowerCase()}`}
++                            >
++                              {member.role === "Owner" && (
++                                <Crown size={12} />
++                              )}
++
++                              {member.role}
++                            </span>
++                          </td>
++
++                          <td>
++                            <span className="teams-access-status">
++                              <Check size={14} />
++                              Active
++                            </span>
++                          </td>
++                        </tr>
++                      ))}
++                    </tbody>
++                  </table>
++
++                  {filteredMembers.length === 0 && (
++                    <div className="teams-empty teams-member-empty">
++                      <Users size={22} />
++                      <strong>No members match</strong>
++                      <span>Change the search or role filter.</span>
++                    </div>
++                  )}
+                 </div>
+-              )}
+-            </div>
+ 
+-            {/* Member count and invitation action */}
+-            <div className="teams-members-footer">
+-              <span>
+-                Showing {filteredMembers.length} of {activeTeam.members.length}{" "}
+-                members
+-              </span>
++                {/* Member count and invitation action */}
++                <div className="teams-members-footer">
++                  <span>
++                    Showing {filteredMembers.length} of{" "}
++                    {activeTeam.members.length} members
++                  </span>
+ 
+-              <button
+-                type="button"
+-                className="teams-invite-button"
+-                onClick={() => {
+-                  if (showInviteForm) {
+-                    setShowInviteForm(false);
+-                  } else {
+-                    handleOpenInviteForm();
+-                  }
+-                }}
+-              >
+-                {showInviteForm ? <X size={16} /> : <Plus size={16} />}
+-                {showInviteForm ? "Cancel invitation" : "Invite members"}
+-              </button>
+-            </div>
++                  <button
++                    type="button"
++                    className="teams-invite-button"
++                    onClick={() =>
++                      setNotice(
++                        "Member invitations are being prepared with secure backend validation.",
++                      )
++                    }
++                  >
++                    <Plus size={16} />
++                    Invite members
++                  </button>
++                </div>
++              </>
++            ) : (
++              <div className="teams-empty">
++                <Building2 size={26} />
++
++                <strong>
++                  {loading ? "Loading workspace..." : "Select a workspace"}
++                </strong>
++
++                <span>
++                  {loading
++                    ? "Your workspace details will appear here."
++                    : "Create a workspace or select one from the list."}
++                </span>
++              </div>
++            )}
+           </section>
+         </div>
+ 
+-        {/* Keep the footer short and unobtrusive. */}
++        {/* Page footer */}
+         <footer className="teams-footer">
+           <ShieldCheck size={16} />
+-          Secure invitations and persistent team data require backend integration.
++          Workspace data is stored securely in your Supabase database.
+         </footer>
+       </div>
+     </main>
+
+
+===== styles/ActivityAuditPage.css =====
+warning: in the working copy of 'src/styles/ActivityAuditPage.css', LF will be replaced by CRLF the next time Git touches it
+
+
+===== styles/DashboardPage.css =====
+warning: in the working copy of 'src/styles/DashboardPage.css', LF will be replaced by CRLF the next time Git touches it
+
+
+===== styles/PipelinesPage.css =====
+warning: in the working copy of 'src/styles/PipelinesPage.css', LF will be replaced by CRLF the next time Git touches it
+
+
+===== styles/RepositoriesPage.css =====
+warning: in the working copy of 'src/styles/RepositoriesPage.css', LF will be replaced by CRLF the next time Git touches it
+
+
+===== styles/SignupPage.css =====
+warning: in the working copy of 'src/styles/SignupPage.css', LF will be replaced by CRLF the next time Git touches it

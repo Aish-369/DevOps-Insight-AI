@@ -8,7 +8,7 @@ import {
   type GitHubRepository,
 } from "../lib/github";
 
-// Store the result of one GitHub API request.
+// Store the result of a GitHub API request.
 type GitHubResult = {
   requestKey: string;
   profile: GitHubProfile | null;
@@ -17,23 +17,19 @@ type GitHubResult = {
 };
 
 // This hook fetches public GitHub data.
+// It does not save usernames or use localStorage.
 export function useGitHubRepositories(username: string) {
-  // Remove extra spaces from the username.
-  const cleanUsername = username.trim();
-
   // Track manual refresh requests.
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Create a unique key for the current request.
-  const requestKey = JSON.stringify([cleanUsername, refreshKey]);
+  // Store the latest completed API request.
+  const [result, setResult] = useState<GitHubResult | null>(null);
 
-  // Store the latest completed API result.
-  const [result, setResult] = useState<GitHubResult>({
-    requestKey: "",
-    profile: null,
-    repositories: [],
-    error: "",
-  });
+  // Remove extra spaces from the username.
+  const cleanUsername = username.trim();
+
+  // Identify each request using username and refresh count.
+  const requestKey = `${cleanUsername}:${refreshKey}`;
 
   // Fetch data when the username or refresh key changes.
   useEffect(() => {
@@ -53,22 +49,25 @@ export function useGitHubRepositories(username: string) {
           fetchGitHubRepositories(cleanUsername, controller.signal),
         ]);
 
-        // Save results only if the request is still active.
-        if (!controller.signal.aborted) {
-          setResult({
-            requestKey,
-            profile: userProfile,
-            repositories: userRepositories,
-            error: "",
-          });
+        // Ignore results from cancelled requests.
+        if (controller.signal.aborted) {
+          return;
         }
+
+        // Save the completed API response.
+        setResult({
+          requestKey,
+          profile: userProfile,
+          repositories: userRepositories,
+          error: "",
+        });
       } catch (err) {
         // Ignore errors caused by cancelled requests.
         if (controller.signal.aborted) {
           return;
         }
 
-        // Save the error for the current request.
+        // Save the API error.
         setResult({
           requestKey,
           profile: null,
@@ -88,18 +87,17 @@ export function useGitHubRepositories(username: string) {
     return () => {
       controller.abort();
     };
-  }, [cleanUsername, refreshKey, requestKey]);
+  }, [cleanUsername, requestKey]);
 
-  // Check whether the stored result belongs to the current request.
-  const isCurrentResult = result.requestKey === requestKey;
+  // Use only results belonging to the current request.
+  const currentResult =
+    result?.requestKey === requestKey ? result : null;
 
-  // Show empty data while the current request is loading.
-  const profile = isCurrentResult ? result.profile : null;
-  const repositories = isCurrentResult ? result.repositories : [];
-  const error = isCurrentResult ? result.error : "";
-
-  // Loading is derived instead of being changed inside the effect.
-  const loading = Boolean(cleanUsername) && !isCurrentResult;
+  // Derive loading and data from the current request.
+  const loading = Boolean(cleanUsername) && !currentResult;
+  const profile = currentResult?.profile ?? null;
+  const repositories = currentResult?.repositories ?? [];
+  const error = currentResult?.error ?? "";
 
   // Allow the user to manually reload GitHub data.
   function refresh() {

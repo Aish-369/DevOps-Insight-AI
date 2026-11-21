@@ -1,0 +1,1263 @@
+﻿diff --git a/src/pages/TeamsPage.tsx b/frontend/src/pages/TeamsPage.tsx
+index 989f231..3cd5224 100644
+--- a/src/pages/TeamsPage.tsx
++++ b/frontend/src/pages/TeamsPage.tsx
+@@ -1,5 +1,11 @@
+ 
+-import { useEffect, useMemo, useState, type FormEvent } from "react";
++import {
++  useCallback,
++  useEffect,
++  useMemo,
++  useState,
++  type FormEvent,
++} from "react";
+ import { Link } from "react-router-dom";
+ import {
+   ArrowLeft,
+@@ -15,14 +21,14 @@ import {
+   X,
+ } from "lucide-react";
+ 
++import { supabase } from "../lib/supabase";
+ import "../styles/TeamsPage.css";
+ 
+-// Available workspace roles.
+ type TeamRole = "Owner" | "Admin" | "Member";
+ 
+-// Information stored for each team member.
+ type TeamMember = {
+-  id: number;
++  id: string;
++  userId: string;
+   name: string;
+   email: string;
+   initials: string;
+@@ -30,153 +36,62 @@ type TeamMember = {
+   color: string;
+ };
+ 
+-// Information stored for each workspace.
+ type Team = {
+-  id: number;
++  id: string;
+   name: string;
+   description: string;
+   initials: string;
+   color: string;
+   members: TeamMember[];
+   projects: number;
++  myRole: TeamRole;
+ };
+ 
+-// Sample data for the UI preview.
+-// This data is not saved to Supabase.
+-const initialTeams: Team[] = [
+-  {
+-    id: 1,
+-    name: "Platform Engineering",
+-    description: "Core infrastructure, CI/CD and developer experience.",
+-    initials: "PE",
+-    color: "lavender",
+-    projects: 8,
+-    members: [
+-      {
+-        id: 1,
+-        name: "Aishwarya Pawar",
+-        email: "you@example.com",
+-        initials: "AP",
+-        role: "Owner",
+-        color: "purple",
+-      },
+-      {
+-        id: 2,
+-        name: "Rohan Kulkarni",
+-        email: "rohan@example.com",
+-        initials: "RK",
+-        role: "Admin",
+-        color: "blue",
+-      },
+-      {
+-        id: 3,
+-        name: "Neha Shah",
+-        email: "neha@example.com",
+-        initials: "NS",
+-        role: "Member",
+-        color: "peach",
+-      },
+-    ],
+-  },
+-  {
+-    id: 2,
+-    name: "Client Delivery",
+-    description:
+-      "Deployment health and delivery workflows for client projects.",
+-    initials: "CD",
+-    color: "mint",
+-    projects: 5,
+-    members: [
+-      {
+-        id: 1,
+-        name: "Aishwarya Pawar",
+-        email: "you@example.com",
+-        initials: "AP",
+-        role: "Owner",
+-        color: "purple",
+-      },
+-      {
+-        id: 4,
+-        name: "Arjun Deshmukh",
+-        email: "arjun@example.com",
+-        initials: "AD",
+-        role: "Member",
+-        color: "green",
+-      },
+-    ],
+-  },
+-  {
+-    id: 3,
+-    name: "Product & QA",
+-    description: "Release readiness, test automation and product quality.",
+-    initials: "PQ",
+-    color: "peach",
+-    projects: 3,
+-    members: [
+-      {
+-        id: 1,
+-        name: "Aishwarya Pawar",
+-        email: "you@example.com",
+-        initials: "AP",
+-        role: "Owner",
+-        color: "purple",
+-      },
+-      {
+-        id: 5,
+-        name: "Mira Joshi",
+-        email: "mira@example.com",
+-        initials: "MJ",
+-        role: "Member",
+-        color: "blue",
+-      },
+-      {
+-        id: 6,
+-        name: "Dev Patel",
+-        email: "dev@example.com",
+-        initials: "DP",
+-        role: "Member",
+-        color: "green",
+-      },
+-      {
+-        id: 7,
+-        name: "Sara Khan",
+-        email: "sara@example.com",
+-        initials: "SK",
+-        role: "Admin",
+-        color: "peach",
+-      },
+-    ],
+-  },
+-];
++const colors = ["lavender", "mint", "peach", "blue"];
++
++// Generate initials for a workspace or member.
++function getInitials(value: string) {
++  return (
++    value
++      .trim()
++      .split(/\s+/)
++      .slice(0, 2)
++      .map((part) => part[0])
++      .join("")
++      .toUpperCase() || "TM"
++  );
++}
++
++// Convert database roles into UI roles.
++function mapRole(role: string): TeamRole {
++  if (role === "owner") return "Owner";
++  if (role === "admin") return "Admin";
++  return "Member";
++}
+ 
+ export default function TeamsPage() {
+-  // Store workspace data in React state.
+-  const [teams, setTeams] = useState<Team[]>(initialTeams);
++  // Actual workspace data loaded from Supabase.
++  const [teams, setTeams] = useState<Team[]>([]);
+ 
+-  // Track the currently selected workspace.
+-  const [activeTeamId, setActiveTeamId] = useState(1);
++  // Currently selected workspace.
++  const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
+ 
+-  // Search and filter state.
+-  const [search, setSearch] = useState("");
++  // Independent search and filter states.
++  const [workspaceSearch, setWorkspaceSearch] = useState("");
++  const [memberSearch, setMemberSearch] = useState("");
+   const [roleFilter, setRoleFilter] = useState("All roles");
+ 
+-  // Control the create and invite forms.
++  // Create workspace form state.
+   const [showCreateForm, setShowCreateForm] = useState(false);
+-  const [showInviteForm, setShowInviteForm] = useState(false);
+-
+-  // Create workspace form values.
+   const [teamName, setTeamName] = useState("");
+   const [teamDescription, setTeamDescription] = useState("");
+ 
+-  // Invite member form values.
+-  const [inviteEmail, setInviteEmail] = useState("");
+-  const [inviteRole, setInviteRole] =
+-    useState<"Admin" | "Member">("Member");
+-
+-  // Temporary notification message.
++  // Loading and notification states.
+   const [notice, setNotice] = useState("");
++  const [loading, setLoading] = useState(true);
++  const [creating, setCreating] = useState(false);
+ 
+-  // Automatically hide notifications after 3.5 seconds.
++  // Automatically hide notifications.
+   useEffect(() => {
+     if (!notice) return;
+ 
+@@ -187,169 +102,282 @@ export default function TeamsPage() {
+     return () => window.clearTimeout(timeoutId);
+   }, [notice]);
+ 
++  // Load workspaces and their related database records.
++  const loadTeams = useCallback(async () => {
++    setLoading(true);
++
++    try {
++      // Get the currently authenticated user.
++      const {
++        data: { user },
++        error: authError,
++      } = await supabase.auth.getUser();
++
++      if (authError) throw authError;
++
++      if (!user) {
++        setTeams([]);
++        setActiveTeamId(null);
++        setNotice("Please sign in to view your workspaces.");
++        return;
++      }
++
++      // Read the current user's profile.
++      const { data: profile, error: profileError } = await supabase
++        .from("profiles")
++        .select("display_name")
++        .eq("id", user.id)
++        .maybeSingle();
++
++      if (profileError) throw profileError;
++
++      const currentName =
++        profile?.display_name ||
++        user.user_metadata?.full_name ||
++        user.email?.split("@")[0] ||
++        "You";
++
++      // Fetch workspaces visible to the current user.
++      const { data: teamRows, error: teamsError } = await supabase
++        .from("teams")
++        .select("id, name, description, owner_id, created_at")
++        .order("created_at", { ascending: false });
++
++      if (teamsError) throw teamsError;
++
++      const rows = teamRows ?? [];
++
++      // Clear the page when the user has no workspaces.
++      if (rows.length === 0) {
++        setTeams([]);
++        setActiveTeamId(null);
++        return;
++      }
++
++      const teamIds = rows.map((team) => team.id);
++
++      // Fetch actual memberships.
++      const { data: memberRows, error: membersError } = await supabase
++        .from("team_members")
++        .select("id, team_id, user_id, role")
++        .in("team_id", teamIds);
++
++      if (membersError) throw membersError;
++
++      // Fetch actual projects.
++      const { data: projectRows, error: projectsError } = await supabase
++        .from("team_projects")
++        .select("id, team_id")
++        .in("team_id", teamIds);
++
++      if (projectsError) throw projectsError;
++
++      const memberships = memberRows ?? [];
++      const projects = projectRows ?? [];
++
++      // Convert database records into the UI data structure.
++      const mappedTeams: Team[] = rows.map((team, index) => {
++        const teamMembers = memberships.filter(
++          (member) => member.team_id === team.id,
++        );
++
++        const currentMembership = teamMembers.find(
++          (member) => member.user_id === user.id,
++        );
++
++        const members: TeamMember[] = teamMembers.map(
++          (member, memberIndex) => {
++            const isCurrentUser = member.user_id === user.id;
++
++            // Do not invent private profile details for other users.
++            const displayName = isCurrentUser
++              ? currentName
++              : "Team member";
++
++            return {
++              id: member.id,
++              userId: member.user_id,
++              name: displayName,
++              email: isCurrentUser ? user.email ?? "" : "",
++              initials: getInitials(displayName),
++              role: mapRole(member.role),
++              color: isCurrentUser
++                ? "purple"
++                : colors[memberIndex % colors.length],
++            };
++          },
++        );
++
++        return {
++          id: team.id,
++          name: team.name,
++          description:
++            team.description || "No workspace description added.",
++          initials: getInitials(team.name),
++          color: colors[index % colors.length],
++          members,
++          projects: projects.filter(
++            (project) => project.team_id === team.id,
++          ).length,
++          myRole: currentMembership
++            ? mapRole(currentMembership.role)
++            : team.owner_id === user.id
++              ? "Owner"
++              : "Member",
++        };
++      });
++
++      setTeams(mappedTeams);
++
++      // Preserve the selected workspace when it still exists.
++      setActiveTeamId((currentId) => {
++        if (
++          currentId &&
++          mappedTeams.some((team) => team.id === currentId)
++        ) {
++          return currentId;
++        }
++
++        return mappedTeams[0]?.id ?? null;
++      });
++    } catch (error) {
++      console.error("Workspace loading failed:", error);
++
++      setNotice(
++        error instanceof Error
++          ? error.message
++          : "Unable to load workspaces.",
++      );
++    } finally {
++      setLoading(false);
++    }
++  }, []);
++
++  // Schedule the initial workspace load after the component mounts.
++  // This avoids synchronously triggering state updates inside the effect.
++  useEffect(() => {
++    const timeoutId = window.setTimeout(() => {
++      void loadTeams();
++    }, 0);
++
++    return () => window.clearTimeout(timeoutId);
++  }, [loadTeams]);
++
+   // Find the selected workspace.
+   const activeTeam =
+-    teams.find((team) => team.id === activeTeamId) ?? teams[0];
++    teams.find((team) => team.id === activeTeamId) ?? null;
+ 
+-  // Search workspaces by name or description.
++  // Search workspaces independently.
+   const filteredTeams = useMemo(
+     () =>
+       teams.filter((team) =>
+         `${team.name} ${team.description}`
+           .toLowerCase()
+-          .includes(search.toLowerCase()),
++          .includes(workspaceSearch.toLowerCase()),
+       ),
+-    [teams, search],
++    [teams, workspaceSearch],
+   );
+ 
+   // Search and filter members in the selected workspace.
+-  const filteredMembers = activeTeam.members.filter(
+-    (member) =>
+-      `${member.name} ${member.email}`
++  const filteredMembers = useMemo(() => {
++    if (!activeTeam) return [];
++
++    return activeTeam.members.filter((member) => {
++      const matchesSearch = `${member.name} ${member.email}`
+         .toLowerCase()
+-        .includes(search.toLowerCase()) &&
+-      (roleFilter === "All roles" || member.role === roleFilter),
+-  );
++        .includes(memberSearch.toLowerCase());
++
++      const matchesRole =
++        roleFilter === "All roles" || member.role === roleFilter;
++
++      return matchesSearch && matchesRole;
++    });
++  }, [activeTeam, memberSearch, roleFilter]);
+ 
+-  // Count unique member IDs across all workspaces.
++  // Count unique members across all workspaces.
+   const totalMembers = new Set(
+-    teams.flatMap((team) => team.members.map((member) => member.id)),
++    teams.flatMap((team) => team.members.map((member) => member.userId)),
+   ).size;
+ 
+-  // Count projects across all workspaces.
++  // Count actual projects across all workspaces.
+   const totalProjects = teams.reduce(
+     (sum, team) => sum + team.projects,
+     0,
+   );
+ 
+-  // Create a workspace in the local preview.
+-  function handleCreateTeam(event: FormEvent<HTMLFormElement>) {
++  // Create a workspace in Supabase.
++  async function handleCreateTeam(event: FormEvent<HTMLFormElement>) {
+     event.preventDefault();
+ 
+     const cleanName = teamName.trim();
++    const cleanDescription = teamDescription.trim();
+ 
+     if (!cleanName) {
+       setNotice("Please enter a workspace name.");
+       return;
+     }
+ 
+-    // Prevent duplicate workspace names.
+-    const alreadyExists = teams.some(
++    // Prevent duplicate workspace names in the current list.
++    const duplicate = teams.some(
+       (team) => team.name.toLowerCase() === cleanName.toLowerCase(),
+     );
+ 
+-    if (alreadyExists) {
++    if (duplicate) {
+       setNotice("A workspace with this name already exists.");
+       return;
+     }
+ 
+-    const newTeam: Team = {
+-      id: Date.now(),
+-      name: cleanName,
+-      description:
+-        teamDescription.trim() ||
+-        "A new workspace for your team's projects.",
+-      initials: cleanName
+-        .split(/\s+/)
+-        .slice(0, 2)
+-        .map((part) => part[0])
+-        .join("")
+-        .toUpperCase(),
+-      color: "lavender",
+-      projects: 0,
+-      members: [
+-        {
+-          id: Date.now() + 1,
+-          name: "Aishwarya Pawar",
+-          email: "you@example.com",
+-          initials: "AP",
+-          role: "Owner",
+-          color: "purple",
+-        },
+-      ],
+-    };
+-
+-    setTeams((current) => [newTeam, ...current]);
+-    setActiveTeamId(newTeam.id);
+-    setTeamName("");
+-    setTeamDescription("");
+-    setSearch("");
+-    setRoleFilter("All roles");
+-    setShowCreateForm(false);
+-    setShowInviteForm(false);
+-    setNotice(`"${cleanName}" was added to the local preview.`);
+-  }
+-
+-  // Open the invite form and clear old input.
+-  function handleOpenInviteForm() {
+-    setInviteEmail("");
+-    setInviteRole("Member");
+-    setShowInviteForm(true);
+-    setNotice("");
+-  }
+-
+-  // Add a member to the selected workspace preview.
+-  function handleInviteMember(event: FormEvent<HTMLFormElement>) {
+-    event.preventDefault();
+-
+-    const cleanEmail = inviteEmail.trim().toLowerCase();
+-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+-
+-    // Validate the email address.
+-    if (!emailPattern.test(cleanEmail)) {
+-      setNotice("Please enter a valid email address.");
+-      return;
++    setCreating(true);
++
++    try {
++      // Verify the authenticated user.
++      const {
++        data: { user },
++        error: authError,
++      } = await supabase.auth.getUser();
++
++      if (authError) throw authError;
++
++      if (!user) {
++        throw new Error("Please sign in before creating a workspace.");
++      }
++
++      // Save the workspace in the database.
++      const { data, error } = await supabase
++        .from("teams")
++        .insert({
++          name: cleanName,
++          description: cleanDescription || null,
++          owner_id: user.id,
++        })
++        .select("id")
++        .single();
++
++      if (error) throw error;
++
++      // The database trigger creates the owner's membership.
++      await loadTeams();
++
++      setActiveTeamId(data.id);
++      setTeamName("");
++      setTeamDescription("");
++      setWorkspaceSearch("");
++      setMemberSearch("");
++      setRoleFilter("All roles");
++      setShowCreateForm(false);
++
++      setNotice(`"${cleanName}" workspace created successfully.`);
++    } catch (error) {
++      console.error("Workspace creation failed:", error);
++
++      setNotice(
++        error instanceof Error
++          ? error.message
++          : "Unable to create workspace.",
++      );
++    } finally {
++      setCreating(false);
+     }
+-
+-    // Check whether this email already exists in the workspace.
+-    const alreadyMember = activeTeam.members.some(
+-      (member) => member.email.toLowerCase() === cleanEmail,
+-    );
+-
+-    if (alreadyMember) {
+-      setNotice("This email already belongs to the selected workspace.");
+-      return;
+-    }
+-
+-    // Generate a display name from the email address.
+-    const emailName = cleanEmail.split("@")[0];
+-    const displayName = emailName
+-      .replace(/[._-]+/g, " ")
+-      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+-
+-    const initials =
+-      displayName
+-        .split(/\s+/)
+-        .slice(0, 2)
+-        .map((part) => part[0])
+-        .join("")
+-        .toUpperCase() || "TM";
+-
+-    const newMember: TeamMember = {
+-      id: Date.now(),
+-      name: displayName,
+-      email: cleanEmail,
+-      initials,
+-      role: inviteRole,
+-      color: "blue",
+-    };
+-
+-    // Update only the selected workspace.
+-    setTeams((currentTeams) =>
+-      currentTeams.map((team) =>
+-        team.id === activeTeamId
+-          ? { ...team, members: [...team.members, newMember] }
+-          : team,
+-      ),
+-    );
+-
+-    setInviteEmail("");
+-    setInviteRole("Member");
+-    setShowInviteForm(false);
+-
+-    setNotice(
+-      `${cleanEmail} was added as ${inviteRole}. No email was sent.`,
+-    );
+   }
+ 
+   return (
+@@ -388,11 +416,10 @@ export default function TeamsPage() {
+           </button>
+         </header>
+ 
+-        {/* Temporary toast notification */}
++        {/* Notification */}
+         {notice && (
+           <div className="teams-toast" role="status">
+             <Check size={18} />
+-
+             <span>{notice}</span>
+ 
+             <button
+@@ -431,6 +458,7 @@ export default function TeamsPage() {
+             <form className="teams-create-form" onSubmit={handleCreateTeam}>
+               <label>
+                 Team name <span aria-hidden="true">*</span>
++
+                 <input
+                   autoFocus
+                   maxLength={60}
+@@ -444,6 +472,7 @@ export default function TeamsPage() {
+               <label>
+                 Description{" "}
+                 <span className="teams-optional">(optional)</span>
++
+                 <input
+                   maxLength={140}
+                   value={teamDescription}
+@@ -463,16 +492,20 @@ export default function TeamsPage() {
+                   Cancel
+                 </button>
+ 
+-                <button className="teams-primary-button" type="submit">
++                <button
++                  className="teams-primary-button"
++                  type="submit"
++                  disabled={creating}
++                >
+                   <Plus size={17} />
+-                  Create preview team
++                  {creating ? "Creating..." : "Create workspace"}
+                 </button>
+               </div>
+             </form>
+           </section>
+         )}
+ 
+-        {/* Compact workspace summary */}
++        {/* Workspace summary */}
+         <section className="teams-metrics" aria-label="Workspace summary">
+           <article className="teams-metric-card">
+             <span className="teams-metric-icon purple">
+@@ -481,7 +514,7 @@ export default function TeamsPage() {
+ 
+             <div>
+               <p>Workspaces</p>
+-              <strong>{teams.length}</strong>
++              <strong>{loading ? "ΓÇö" : teams.length}</strong>
+             </div>
+ 
+             <span className="teams-metric-caption">
+@@ -496,7 +529,7 @@ export default function TeamsPage() {
+ 
+             <div>
+               <p>Unique members</p>
+-              <strong>{totalMembers}</strong>
++              <strong>{loading ? "ΓÇö" : totalMembers}</strong>
+             </div>
+ 
+             <span className="teams-metric-caption">
+@@ -511,11 +544,11 @@ export default function TeamsPage() {
+ 
+             <div>
+               <p>Projects</p>
+-              <strong>{totalProjects}</strong>
++              <strong>{loading ? "ΓÇö" : totalProjects}</strong>
+             </div>
+ 
+             <span className="teams-metric-caption">
+-              Sample workspace data
++              Saved workspace projects
+             </span>
+           </article>
+         </section>
+@@ -539,53 +572,73 @@ export default function TeamsPage() {
+               <span className="teams-sr-only">Search workspaces</span>
+ 
+               <input
+-                value={search}
+-                onChange={(event) => setSearch(event.target.value)}
+-                placeholder="Search workspaces or members"
++                value={workspaceSearch}
++                onChange={(event) =>
++                  setWorkspaceSearch(event.target.value)
++                }
++                placeholder="Search workspaces"
+               />
+             </label>
+ 
+             <div className="teams-list">
+-              {filteredTeams.map((team) => (
+-                <button
+-                  type="button"
+-                  key={team.id}
+-                  className={`teams-list-item ${
+-                    activeTeamId === team.id ? "selected" : ""
+-                  }`}
+-                  onClick={() => {
+-                    setActiveTeamId(team.id);
+-                    setRoleFilter("All roles");
+-                    setShowInviteForm(false);
+-                    setNotice("");
+-                  }}
+-                >
+-                  <span
+-                    className={`teams-avatar teams-avatar-${team.color}`}
+-                  >
+-                    {team.initials}
+-                  </span>
+-
+-                  <span className="teams-list-copy">
+-                    <strong>{team.name}</strong>
+-                    <small>
+-                      {team.members.length} members ┬╖ {team.projects} projects
+-                    </small>
+-                  </span>
+-
+-                  <ChevronRight
+-                    className="teams-list-chevron"
+-                    size={18}
+-                  />
+-                </button>
+-              ))}
+-
+-              {filteredTeams.length === 0 && (
++              {loading ? (
+                 <div className="teams-empty">
+-                  <Search size={23} />
+-                  <strong>No workspaces found</strong>
+-                  <span>Try another search term.</span>
++                  <span>Loading workspaces...</span>
+                 </div>
++              ) : (
++                <>
++                  {filteredTeams.map((team) => (
++                    <button
++                      type="button"
++                      key={team.id}
++                      className={`teams-list-item ${
++                        activeTeamId === team.id ? "selected" : ""
++                      }`}
++                      onClick={() => {
++                        setActiveTeamId(team.id);
++                        setRoleFilter("All roles");
++                        setMemberSearch("");
++                      }}
++                    >
++                      <span
++                        className={`teams-avatar teams-avatar-${team.color}`}
++                      >
++                        {team.initials}
++                      </span>
++
++                      <span className="teams-list-copy">
++                        <strong>{team.name}</strong>
++
++                        <small>
++                          {team.members.length} members ┬╖ {team.projects} projects
++                        </small>
++                      </span>
++
++                      <ChevronRight
++                        className="teams-list-chevron"
++                        size={18}
++                      />
++                    </button>
++                  ))}
++
++                  {filteredTeams.length === 0 && (
++                    <div className="teams-empty">
++                      <Search size={23} />
++
++                      <strong>
++                        {teams.length === 0
++                          ? "No workspaces yet"
++                          : "No workspaces found"}
++                      </strong>
++
++                      <span>
++                        {teams.length === 0
++                          ? "Create your first workspace to get started."
++                          : "Try another search term."}
++                      </span>
++                    </div>
++                  )}
++                </>
+               )}
+             </div>
+ 
+@@ -604,258 +657,214 @@ export default function TeamsPage() {
+ 
+           {/* Selected workspace details */}
+           <section className="teams-panel teams-detail-panel">
+-            <div className="teams-detail-top">
+-              <span
+-                className={`teams-avatar teams-avatar-${activeTeam.color} teams-avatar-large`}
+-              >
+-                {activeTeam.initials}
+-              </span>
+-
+-              <div className="teams-detail-title">
+-                <p className="teams-detail-label">WORKSPACE DETAILS</p>
+-
+-                <h2>{activeTeam.name}</h2>
+-
+-                <p>{activeTeam.description}</p>
+-              </div>
+-
+-              <button
+-                className="teams-icon-button"
+-                type="button"
+-                title="Workspace settings are coming soon"
+-                aria-label="Workspace settings (coming soon)"
+-                onClick={() =>
+-                  setNotice(
+-                    "Workspace settings will be available in a later update.",
+-                  )
+-                }
+-              >
+-                <ShieldCheck size={19} />
+-              </button>
+-            </div>
+-
+-            {/* Selected workspace statistics */}
+-            <div className="teams-detail-stats">
+-              <div>
+-                <span>Members</span>
+-                <strong>{activeTeam.members.length}</strong>
+-              </div>
+-
+-              <div>
+-                <span>Projects</span>
+-                <strong>{activeTeam.projects}</strong>
+-              </div>
+-
+-              <div>
+-                <span>Your role</span>
+-                <strong>Owner</strong>
+-              </div>
+-            </div>
++            {activeTeam ? (
++              <>
++                <div className="teams-detail-top">
++                  <span
++                    className={`teams-avatar teams-avatar-${activeTeam.color} teams-avatar-large`}
++                  >
++                    {activeTeam.initials}
++                  </span>
+ 
+-            {/* Members heading */}
+-            <div className="teams-members-heading">
+-              <div>
+-                <h3>Team members</h3>
+-                <p>People with access to this workspace</p>
+-              </div>
++                  <div className="teams-detail-title">
++                    <p className="teams-detail-label">
++                      WORKSPACE DETAILS
++                    </p>
+ 
+-              <span className="teams-count-pill">
+-                {filteredMembers.length}
+-              </span>
+-            </div>
++                    <h2>{activeTeam.name}</h2>
++                    <p>{activeTeam.description}</p>
++                  </div>
+ 
+-            {/* Member search and role filter */}
+-            <div className="teams-member-toolbar">
+-              <label className="teams-member-search">
+-                <Search size={15} />
+-                <span className="teams-sr-only">Search team members</span>
++                  <button
++                    className="teams-icon-button"
++                    type="button"
++                    title="Workspace settings are coming soon"
++                    aria-label="Workspace settings (coming soon)"
++                    onClick={() =>
++                      setNotice(
++                        "Workspace settings will be available in a later update.",
++                      )
++                    }
++                  >
++                    <ShieldCheck size={19} />
++                  </button>
++                </div>
+ 
+-                <input
+-                  value={search}
+-                  onChange={(event) => setSearch(event.target.value)}
+-                  placeholder="Search members"
+-                />
+-              </label>
++                {/* Workspace statistics */}
++                <div className="teams-detail-stats">
++                  <div>
++                    <span>Members</span>
++                    <strong>{activeTeam.members.length}</strong>
++                  </div>
+ 
+-              <label className="teams-role-filter">
+-                <span className="teams-sr-only">Filter by role</span>
++                  <div>
++                    <span>Projects</span>
++                    <strong>{activeTeam.projects}</strong>
++                  </div>
+ 
+-                <select
+-                  value={roleFilter}
+-                  onChange={(event) => setRoleFilter(event.target.value)}
+-                >
+-                  <option>All roles</option>
+-                  <option>Owner</option>
+-                  <option>Admin</option>
+-                  <option>Member</option>
+-                </select>
+-              </label>
+-            </div>
++                  <div>
++                    <span>Your role</span>
++                    <strong>{activeTeam.myRole}</strong>
++                  </div>
++                </div>
+ 
+-            {/* Invite member form appears only when requested */}
+-            {showInviteForm && (
+-              <section
+-                className="teams-create-panel"
+-                aria-labelledby="invite-member-title"
+-              >
+-                <div className="teams-create-heading">
++                {/* Members heading */}
++                <div className="teams-members-heading">
+                   <div>
+-                    <h2 id="invite-member-title">Add a team member</h2>
+-                    <p>Enter an email address and select a role.</p>
++                    <h3>Team members</h3>
++                    <p>People with access to this workspace</p>
+                   </div>
+ 
+-                  <button
+-                    className="teams-icon-button"
+-                    type="button"
+-                    aria-label="Close invitation form"
+-                    onClick={() => setShowInviteForm(false)}
+-                  >
+-                    <X size={19} />
+-                  </button>
++                  <span className="teams-count-pill">
++                    {filteredMembers.length}
++                  </span>
+                 </div>
+ 
+-                <form
+-                  className="teams-create-form"
+-                  onSubmit={handleInviteMember}
+-                >
+-                  <label>
+-                    Email address <span aria-hidden="true">*</span>
++                {/* Member search and role filter */}
++                <div className="teams-member-toolbar">
++                  <label className="teams-member-search">
++                    <Search size={15} />
++
++                    <span className="teams-sr-only">
++                      Search team members
++                    </span>
+ 
+                     <input
+-                      type="email"
+-                      autoFocus
+-                      required
+-                      maxLength={254}
+-                      value={inviteEmail}
++                      value={memberSearch}
+                       onChange={(event) =>
+-                        setInviteEmail(event.target.value)
++                        setMemberSearch(event.target.value)
+                       }
+-                      placeholder="name@company.com"
++                      placeholder="Search members"
+                     />
+                   </label>
+ 
+-                  <label>
+-                    Workspace role
++                  <label className="teams-role-filter">
++                    <span className="teams-sr-only">
++                      Filter by role
++                    </span>
+ 
+                     <select
+-                      value={inviteRole}
++                      value={roleFilter}
+                       onChange={(event) =>
+-                        setInviteRole(event.target.value as "Admin" | "Member")
++                        setRoleFilter(event.target.value)
+                       }
+                     >
+-                      <option value="Member">Member</option>
+-                      <option value="Admin">Admin</option>
++                      <option>All roles</option>
++                      <option>Owner</option>
++                      <option>Admin</option>
++                      <option>Member</option>
+                     </select>
+                   </label>
++                </div>
+ 
+-                  <div className="teams-form-actions">
+-                    <button
+-                      className="teams-secondary-button"
+-                      type="button"
+-                      onClick={() => setShowInviteForm(false)}
+-                    >
+-                      Cancel
+-                    </button>
+-
+-                    <button
+-                      className="teams-primary-button"
+-                      type="submit"
+-                    >
+-                      <Plus size={17} />
+-                      Add member
+-                    </button>
+-                  </div>
+-                </form>
+-              </section>
+-            )}
+-
+-            {/* Members table */}
+-            <div className="teams-table-wrap">
+-              <table className="teams-members-table">
+-                <thead>
+-                  <tr>
+-                    <th>Member</th>
+-                    <th>Role</th>
+-                    <th>Access</th>
+-                  </tr>
+-                </thead>
+-
+-                <tbody>
+-                  {filteredMembers.map((member) => (
+-                    <tr key={`${activeTeam.id}-${member.id}`}>
+-                      <td>
+-                        <div className="teams-member-cell">
+-                          <span
+-                            className={`teams-member-avatar ${member.color}`}
+-                          >
+-                            {member.initials}
+-                          </span>
+-
+-                          <span>
+-                            <strong>{member.name}</strong>
+-                            <small>{member.email}</small>
+-                          </span>
+-                        </div>
+-                      </td>
+-
+-                      <td>
+-                        <span
+-                          className={`teams-role-badge ${member.role.toLowerCase()}`}
+-                        >
+-                          {member.role === "Owner" && <Crown size={12} />}
+-                          {member.role}
+-                        </span>
+-                      </td>
+-
+-                      <td>
+-                        <span className="teams-access-status">
+-                          <Check size={14} />
+-                          Active
+-                        </span>
+-                      </td>
+-                    </tr>
+-                  ))}
+-                </tbody>
+-              </table>
+-
+-              {filteredMembers.length === 0 && (
+-                <div className="teams-empty teams-member-empty">
+-                  <Users size={22} />
+-                  <strong>No members match</strong>
+-                  <span>Change the search or role filter.</span>
++                {/* Members table */}
++                <div className="teams-table-wrap">
++                  <table className="teams-members-table">
++                    <thead>
++                      <tr>
++                        <th>Member</th>
++                        <th>Role</th>
++                        <th>Access</th>
++                      </tr>
++                    </thead>
++
++                    <tbody>
++                      {filteredMembers.map((member) => (
++                        <tr key={member.id}>
++                          <td>
++                            <div className="teams-member-cell">
++                              <span
++                                className={`teams-member-avatar ${member.color}`}
++                              >
++                                {member.initials}
++                              </span>
++
++                              <span>
++                                <strong>{member.name}</strong>
++
++                                <small>
++                                  {member.email ||
++                                    "Profile details unavailable"}
++                                </small>
++                              </span>
++                            </div>
++                          </td>
++
++                          <td>
++                            <span
++                              className={`teams-role-badge ${member.role.toLowerCase()}`}
++                            >
++                              {member.role === "Owner" && (
++                                <Crown size={12} />
++                              )}
++
++                              {member.role}
++                            </span>
++                          </td>
++
++                          <td>
++                            <span className="teams-access-status">
++                              <Check size={14} />
++                              Active
++                            </span>
++                          </td>
++                        </tr>
++                      ))}
++                    </tbody>
++                  </table>
++
++                  {filteredMembers.length === 0 && (
++                    <div className="teams-empty teams-member-empty">
++                      <Users size={22} />
++                      <strong>No members match</strong>
++                      <span>Change the search or role filter.</span>
++                    </div>
++                  )}
+                 </div>
+-              )}
+-            </div>
+ 
+-            {/* Member count and invitation action */}
+-            <div className="teams-members-footer">
+-              <span>
+-                Showing {filteredMembers.length} of {activeTeam.members.length}{" "}
+-                members
+-              </span>
++                {/* Member count and invitation action */}
++                <div className="teams-members-footer">
++                  <span>
++                    Showing {filteredMembers.length} of{" "}
++                    {activeTeam.members.length} members
++                  </span>
+ 
+-              <button
+-                type="button"
+-                className="teams-invite-button"
+-                onClick={() => {
+-                  if (showInviteForm) {
+-                    setShowInviteForm(false);
+-                  } else {
+-                    handleOpenInviteForm();
+-                  }
+-                }}
+-              >
+-                {showInviteForm ? <X size={16} /> : <Plus size={16} />}
+-                {showInviteForm ? "Cancel invitation" : "Invite members"}
+-              </button>
+-            </div>
++                  <button
++                    type="button"
++                    className="teams-invite-button"
++                    onClick={() =>
++                      setNotice(
++                        "Member invitations are being prepared with secure backend validation.",
++                      )
++                    }
++                  >
++                    <Plus size={16} />
++                    Invite members
++                  </button>
++                </div>
++              </>
++            ) : (
++              <div className="teams-empty">
++                <Building2 size={26} />
++
++                <strong>
++                  {loading ? "Loading workspace..." : "Select a workspace"}
++                </strong>
++
++                <span>
++                  {loading
++                    ? "Your workspace details will appear here."
++                    : "Create a workspace or select one from the list."}
++                </span>
++              </div>
++            )}
+           </section>
+         </div>
+ 
+-        {/* Keep the footer short and unobtrusive. */}
++        {/* Page footer */}
+         <footer className="teams-footer">
+           <ShieldCheck size={16} />
+-          Secure invitations and persistent team data require backend integration.
++          Workspace data is stored securely in your Supabase database.
+         </footer>
+       </div>
+     </main>
