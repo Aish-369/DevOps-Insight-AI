@@ -20,11 +20,6 @@ function isDuplicateSignupError(error: unknown): boolean {
     message.includes("already exists")
   );
 }
-import { supabase } from "../lib/supabase";
-
-// Import the matching signup CSS file.
-import "../styles/SignupPage.css";
-
 export default function SignupPage() {
   const navigate = useNavigate();
 

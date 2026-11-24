@@ -12,6 +12,8 @@
 - Account settings to request an email change and change the current account password.
 - Dashboard account settings navigation.
 - Logout request errors are handled without falsely navigating away.
+- Duplicate-signup errors are mapped to generic copy to reduce account enumeration.
+- Signup, recovery and account-password forms apply a 12-character client-side minimum; the Supabase Auth policy must be configured to enforce the same or stronger rule server-side.
 
 ## Supabase Auth dashboard configuration still required
 
@@ -28,6 +30,7 @@ In Supabase Dashboard → Authentication → URL Configuration:
    - `https://YOUR_PRODUCTION_HOST/auth/callback`
    - `https://YOUR_PRODUCTION_HOST/reset-password`
 3. Replace `YOUR_PRODUCTION_HOST` with the verified deployed hostname. Do not add broad wildcard redirect entries unless there is a documented need.
+4. Set the Supabase Auth minimum password length to at least 12 characters (or a stronger chosen policy) so the server enforces the same rule; frontend validation is not a security boundary.
 
 For GitHub sign-in, configure the GitHub OAuth provider in Supabase Auth. The provider's callback URL is the Supabase Auth callback URL shown by the Supabase provider settings (not this frontend's `/auth/callback` path). Do not put GitHub OAuth client secrets in Vite environment variables.
 
@@ -46,3 +49,8 @@ For production email delivery, configure a verified SMTP provider and sender dom
 - Logout invalidates the current local session.
 
 These real provider checks are not claimed as passed by the mocked Playwright suite. They require the actual SMTP/provider settings and controlled test inboxes.
+
+
+## Automated tests
+
+The latest passing GitHub Actions run is documented in [Phase 2 verification](./phase-2-authentication.md). Playwright tests mock the Supabase Auth HTTP boundary and verify frontend redirects, validation and failure states. They do not verify provider credentials or inbox delivery.
