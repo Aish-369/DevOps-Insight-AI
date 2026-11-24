@@ -67,7 +67,7 @@ test("signup provider errors are shown and the submit button recovers", async ({
   const submit = page.getByRole("button", { name: "Create account" });
   await submit.click();
 
-  await expect(page.getByRole("alert")).toContainText("User already registered");
+  await expect(page.getByRole("alert")).toContainText("Unable to create an account with those details");
   await expect(submit).toBeEnabled();
 });
 
