@@ -98,8 +98,21 @@ BEGIN
 END
 $;
 
+INSERT INTO auth.users(id, email) VALUES
+  ('00000000-0000-0000-0000-000000000001', 'owner-one@example.test'),
+  ('00000000-0000-0000-0000-000000000002', 'owner-two@example.test'),
+  ('00000000-0000-0000-0000-000000000003', 'member-one@example.test');
+
+INSERT INTO public.profiles(id, display_name) VALUES
+  ('00000000-0000-0000-0000-000000000001', 'Owner One'),
+  ('00000000-0000-0000-0000-000000000002', 'Owner Two');
+
+INSERT INTO public.teams(id, name, owner_id) VALUES
+  ('10000000-0000-0000-0000-000000000001', 'Team One', '00000000-0000-0000-0000-000000000001'),
+  ('10000000-0000-0000-0000-000000000002', 'Team Two', '00000000-0000-0000-0000-000000000002');
+
 -- The owner invariant is enforced by a trigger even for service-role mutations.
-DO $
+DO $owner_guard$
 DECLARE
   owner_count integer;
 BEGIN
@@ -121,20 +134,8 @@ BEGIN
     END IF;
   END;
 END
-$;
+$owner_guard$;
 
-INSERT INTO auth.users(id, email) VALUES
-  ('00000000-0000-0000-0000-000000000001', 'owner-one@example.test'),
-  ('00000000-0000-0000-0000-000000000002', 'owner-two@example.test'),
-  ('00000000-0000-0000-0000-000000000003', 'member-one@example.test');
-
-INSERT INTO public.profiles(id, display_name) VALUES
-  ('00000000-0000-0000-0000-000000000001', 'Owner One'),
-  ('00000000-0000-0000-0000-000000000002', 'Owner Two');
-
-INSERT INTO public.teams(id, name, owner_id) VALUES
-  ('10000000-0000-0000-0000-000000000001', 'Team One', '00000000-0000-0000-0000-000000000001'),
-  ('10000000-0000-0000-0000-000000000002', 'Team Two', '00000000-0000-0000-0000-000000000002');
 
 INSERT INTO public.team_members(team_id,user_id,role)
 VALUES ('10000000-0000-0000-0000-000000000001',
