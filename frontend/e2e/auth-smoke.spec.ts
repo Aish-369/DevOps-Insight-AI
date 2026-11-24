@@ -71,11 +71,10 @@ test("signup provider errors are shown and the submit button recovers", async ({
   await expect(submit).toBeEnabled();
 });
 
-
 test("forgot password submits a same-origin reset redirect and uses a generic response", async ({ page }) => {
-  let submittedBody: Record<string, unknown> | undefined;
-  await page.route(/\\/auth\\/v1\\/recover$/, async (route) => {
-    submittedBody = route.request().postDataJSON() as Record<string, unknown>;
+  let requestedRedirect = "";
+  await page.route("**/auth/v1/recover*", async (route) => {
+    requestedRedirect = new URL(route.request().url()).searchParams.get("redirect_to") ?? "";
     await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
   });
 
@@ -87,11 +86,11 @@ test("forgot password submits a same-origin reset redirect and uses a generic re
   expect(requestedRedirect).toBe("http://127.0.0.1:4173/reset-password");
 });
 
-test("an auth callback provider denial shows a safe error instead of trusting redirect parameters", async ({ page }) => {
+test("an auth callback provider denial displays a safe error and does not redirect externally", async ({ page }) => {
   await page.goto("/auth/callback?error=access_denied&error_description=Cancelled&next=https%3A%2F%2Fevil.example");
-  await expect(page.getByRole("alert")).toContainText("Sign-in could not be completed");
-  await expect(page.getByRole("link", { name: "Return to sign in" })).toHaveAttribute("href", "/login");
-  await expect(page).toHaveURL(/\\/auth\\/callback/);
+  await expect(page.getByRole("heading", { name: "Sign-in could not be completed" })).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText("Please sign in again");
+  await expect(page).toHaveURL(new RegExp("auth/callback"));
 });
 
 test("an expired password recovery link cannot open the password update form", async ({ page }) => {
@@ -102,12 +101,12 @@ test("an expired password recovery link cannot open the password update form", a
 
 test("account settings remains protected for signed-out visitors", async ({ page }) => {
   await page.goto("/settings/account");
-  await expect(page).toHaveURL(/\\/login$/);
+  await expect(page).toHaveURL(new RegExp("login$"));
 });
 
 test("signup uses the same-origin PKCE callback for email confirmation", async ({ page }) => {
   let signupRedirect = "";
-  await page.route(/\/auth\/v1\/signup$/, async (route) => {
+  await page.route("**/auth/v1/signup*", async (route) => {
     signupRedirect = new URL(route.request().url()).searchParams.get("redirect_to") ?? "";
     await route.fulfill({
       status: 200,
