@@ -16,7 +16,7 @@ This change hardens the existing `frontend/` application without deleting the le
 - Treat Supabase's explicit missing-session error as a normal signed-out state so an unauthenticated user is redirected to login instead of seeing a false session-verification error.
 - Enable TypeScript `strict` mode in the canonical frontend.
 - Add a stable Vite security-version gate and dependency-independent foundation tests.
-- Add CI gates for audit, security policy, tests, lint, strict typecheck and production build.
+- Add CI gates for audit, security policy, unit tests, browser regression tests, lint, strict typecheck and production build.
 - Refresh the two duplicate dependency lockfiles through npm in a branch-scoped GitHub Actions workflow; do not hand-edit lock metadata.
 
 ## Explicitly not changed
@@ -38,9 +38,12 @@ This change hardens the existing `frontend/` application without deleting the le
 
 The production build currently emits a minified JavaScript entry chunk above 500 kB. Route-level code splitting is a follow-up performance improvement.
 
+## Browser regression coverage
+
+Browser checks use a dedicated local Supabase URL and a fake legacy anon-shaped key; all Supabase Auth HTTP calls in the tests are stubbed. These tests validate frontend routing and error/loading behavior, not real provider delivery or live customer accounts.
+
 ## Still outstanding
 
-- Browser-level route and auth-form regression tests.
 - Real Supabase email, OAuth, recovery and reset flow tests using configured providers and controlled test accounts.
 - Cross-tenant authorization and database isolation tests.
 
