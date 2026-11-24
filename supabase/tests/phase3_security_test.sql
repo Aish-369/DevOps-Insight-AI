@@ -40,6 +40,15 @@ BEGIN
   IF has_table_privilege('authenticated', 'public.github_installation_states', 'SELECT') THEN
     RAISE EXCEPTION 'authenticated unexpectedly has SELECT on github_installation_states';
   END IF;
+  IF has_schema_privilege('anon', 'private', 'USAGE') THEN
+    RAISE EXCEPTION 'anon unexpectedly has USAGE on private schema';
+  END IF;
+  IF has_table_privilege('authenticated', 'public.alert_rules', 'UPDATE') THEN
+    RAISE EXCEPTION 'authenticated can update alert_rules primary key';
+  END IF;
+  IF has_column_privilege('authenticated', 'public.analysis_feedback', 'team_id', 'UPDATE') THEN
+    RAISE EXCEPTION 'authenticated can move feedback to another team';
+  END IF;
   IF has_column_privilege('authenticated', 'public.teams', 'owner_id', 'UPDATE') THEN
     RAISE EXCEPTION 'authenticated can modify teams.owner_id';
   END IF;
@@ -60,6 +69,19 @@ BEGIN
      OR to_regprocedure('public.add_team_owner_membership()') IS NOT NULL THEN
     RAISE EXCEPTION 'legacy exposed SECURITY DEFINER functions still exist';
   END IF;
+  CREATE TABLE public.default_privilege_probe (id uuid);
+  IF has_table_privilege('anon', 'public.default_privilege_probe', 'SELECT')
+     OR has_table_privilege('authenticated', 'public.default_privilege_probe', 'SELECT') THEN
+    RAISE EXCEPTION 'new public tables inherit broad default SELECT privileges';
+  END IF;
+  CREATE FUNCTION public.default_function_probe() RETURNS integer
+  LANGUAGE sql AS 'SELECT 1';
+  IF has_function_privilege('anon', 'public.default_function_probe()', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.default_function_probe()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'new public functions inherit broad default EXECUTE privileges';
+  END IF;
+  DROP FUNCTION public.default_function_probe();
+  DROP TABLE public.default_privilege_probe;
   IF EXISTS (
     SELECT 1 FROM pg_constraint
     WHERE conrelid = 'public.profiles'::regclass
@@ -141,13 +163,13 @@ RESET ROLE;
 
 DO $$
 DECLARE
-  team_id uuid;
+  new_team_id uuid;
 BEGIN
-  SELECT id INTO team_id FROM public.teams WHERE name = 'New Team';
+  SELECT id INTO new_team_id FROM public.teams WHERE name = 'New Team';
   IF NOT EXISTS (
-    SELECT 1 FROM public.team_members
-    WHERE team_members.team_id = team_id
-      AND user_id = '00000000-0000-0000-0000-000000000002'
+    SELECT 1 FROM public.team_members AS tm
+    WHERE tm.team_id = new_team_id
+      AND tm.user_id = '00000000-0000-0000-0000-000000000002'
       AND role = 'owner'
   ) THEN
     RAISE EXCEPTION 'New team owner membership trigger did not run';

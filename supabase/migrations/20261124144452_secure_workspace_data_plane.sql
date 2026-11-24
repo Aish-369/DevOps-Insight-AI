@@ -277,7 +277,7 @@ CREATE TABLE public.failure_analyses (
   FOREIGN KEY (github_run_id, team_id)
     REFERENCES public.workflow_runs(github_run_id, team_id) ON DELETE CASCADE,
   FOREIGN KEY (github_job_id, team_id)
-    REFERENCES public.workflow_jobs(github_job_id, team_id) ON DELETE SET NULL
+    REFERENCES public.workflow_jobs(github_job_id, team_id) ON DELETE SET NULL (github_job_id)
 );
 CREATE INDEX failure_analyses_team_signature_created_idx
   ON public.failure_analyses(team_id, signature, created_at DESC);
@@ -472,13 +472,22 @@ GRANT INSERT (team_id, name, repository_url, created_by)
 GRANT UPDATE (name, repository_url) ON public.team_projects TO authenticated;
 GRANT DELETE ON public.team_projects TO authenticated;
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.analysis_feedback TO authenticated;
+GRANT SELECT ON public.analysis_feedback TO authenticated;
+GRANT INSERT (team_id, analysis_id, user_id, helpful, note)
+  ON public.analysis_feedback TO authenticated;
+GRANT UPDATE (helpful, note) ON public.analysis_feedback TO authenticated;
+GRANT DELETE ON public.analysis_feedback TO authenticated;
 GRANT SELECT ON public.alert_channels TO authenticated;
 GRANT INSERT (team_id, channel_type, target, created_by)
   ON public.alert_channels TO authenticated;
 GRANT UPDATE (channel_type, target) ON public.alert_channels TO authenticated;
 GRANT DELETE ON public.alert_channels TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.alert_rules TO authenticated;
+GRANT SELECT ON public.alert_rules TO authenticated;
+GRANT INSERT (team_id, branches, notify_recovered, skip_flaky, daily_ai_cap)
+  ON public.alert_rules TO authenticated;
+GRANT UPDATE (branches, notify_recovered, skip_flaky, daily_ai_cap)
+  ON public.alert_rules TO authenticated;
+GRANT DELETE ON public.alert_rules TO authenticated;
 GRANT SELECT ON public.team_audit_events TO authenticated;
 
 GRANT ALL PRIVILEGES ON TABLE
