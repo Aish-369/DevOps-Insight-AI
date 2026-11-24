@@ -14,6 +14,9 @@ import RepositoriesPage from "./pages/RepositoriesPage";
 import PipelinesPage from "./pages/PipelinesPage";
 import ActivityAuditPage from "./pages/ActivityAuditPage";
 import TeamsPage from "./pages/TeamsPage";
+import AcceptInvitationPage from "./pages/AcceptInvitationPage";
+import IntegrationsPage from "./pages/IntegrationsPage";
+import GithubInstallationCallbackPage from "./pages/GithubInstallationCallbackPage";
 
 // Protect pages that require user login.
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -27,6 +30,10 @@ export default function App() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
+      <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
+
+      <Route path="/integrations" element={<ProtectedRoute><IntegrationsPage /></ProtectedRoute>} />
+      <Route path="/integrations/github/callback" element={<ProtectedRoute><GithubInstallationCallbackPage /></ProtectedRoute>} />
 
       <Route
         path="/settings/account"

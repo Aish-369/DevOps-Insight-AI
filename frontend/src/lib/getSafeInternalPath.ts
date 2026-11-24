@@ -6,6 +6,11 @@ const ALLOWED_AUTH_DESTINATIONS = new Set([
   "/teams",
   "/settings/account",
   "/reset-password",
+  "/accept-invitation",
+  "/integrations",
+  "/integrations/github/callback",
+  "/settings/alerts",
+  "/workflow-runs",
 ]);
 
 /**
