@@ -1,7 +1,12 @@
 {
   "compilerOptions": {
     "strict": true,
-    "lib": ["deno.ns", "dom", "dom.iterable", "esnext"]
+    "lib": [
+      "deno.ns",
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ]
   },
   "imports": {
     "@supabase/supabase-js": "npm:@supabase/supabase-js@2.118.0",
@@ -9,9 +14,9 @@
     "fflate": "npm:fflate@0.8.2"
   },
   "tasks": {
-    "check": "deno check --all supabase/functions",
-    "lint": "deno lint supabase/functions",
-    "fmt:check": "deno fmt --check supabase/functions",
-    "test": "deno test --allow-env --allow-net supabase/functions/tests"
+    "check": "deno check --all .",
+    "lint": "deno lint .",
+    "fmt:check": "deno fmt --check .",
+    "test": "deno test --allow-env --allow-net tests"
   }
 }

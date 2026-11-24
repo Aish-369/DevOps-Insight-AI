@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.dispatch-alerts]
 verify_jwt = false
+
+[functions.verify-alert-channel]
+verify_jwt = false
