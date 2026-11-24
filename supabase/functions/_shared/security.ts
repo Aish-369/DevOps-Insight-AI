@@ -1,7 +1,9 @@
 const encoder = new TextEncoder();
 
 export function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
+  return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join(
+    "",
+  );
 }
 
 export async function sha256Hex(value: string | Uint8Array): Promise<string> {
@@ -13,11 +15,15 @@ export async function sha256Hex(value: string | Uint8Array): Promise<string> {
 }
 
 export function randomToken(byteLength = 32): string {
-  if (!Number.isSafeInteger(byteLength) || byteLength < 16 || byteLength > 128) {
+  if (
+    !Number.isSafeInteger(byteLength) || byteLength < 16 || byteLength > 128
+  ) {
     throw new Error("Token byte length must be between 16 and 128.");
   }
   const bytes = crypto.getRandomValues(new Uint8Array(byteLength));
-  return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
+  return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join(
+    "",
+  );
 }
 
 export function randomNumericCode(length = 6): string {
@@ -46,6 +52,12 @@ export function redactSecrets(input: string): string {
     .replace(/gh[pousr]_[A-Za-z0-9_]{20,}/g, "[REDACTED_GITHUB_TOKEN]")
     .replace(/github_pat_[A-Za-z0-9_]{20,}/g, "[REDACTED_GITHUB_TOKEN]")
     .replace(/Bearer\s+[A-Za-z0-9._~+\/-]{12,}/gi, "Bearer [REDACTED]")
-    .replace(/(api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret)\s*[:=]\s*[^\s,;]+/gi, "$1=[REDACTED]")
-    .replace(/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g, "[REDACTED_PRIVATE_KEY]");
+    .replace(
+      /(api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret)\s*[:=]\s*[^\s,;]+/gi,
+      "$1=[REDACTED]",
+    )
+    .replace(
+      /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g,
+      "[REDACTED_PRIVATE_KEY]",
+    );
 }

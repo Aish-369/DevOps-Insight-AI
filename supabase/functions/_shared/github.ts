@@ -7,14 +7,21 @@ const API_VERSION = "2022-11-28";
 function requiredEnv(name: string): string {
   const value = Deno.env.get(name)?.trim();
   if (!value) {
-    throw new HttpError(503, "GITHUB_APP_NOT_CONFIGURED", "GitHub App integration is not configured.");
+    throw new HttpError(
+      503,
+      "GITHUB_APP_NOT_CONFIGURED",
+      "GitHub App integration is not configured.",
+    );
   }
   return value;
 }
 
 export async function createGithubAppJwt(): Promise<string> {
   const appId = requiredEnv("GITHUB_APP_ID");
-  const privateKeyPem = requiredEnv("GITHUB_APP_PRIVATE_KEY").replaceAll("\\n", "\n");
+  const privateKeyPem = requiredEnv("GITHUB_APP_PRIVATE_KEY").replaceAll(
+    "\\n",
+    "\n",
+  );
   const privateKey = await importPKCS8(privateKeyPem, "RS256");
   const issuedAt = Math.floor(Date.now() / 1000) - 60;
 
@@ -44,20 +51,35 @@ export async function githubAppRequest<T>(
   });
 
   if (!response.ok) {
-    console.error("GitHub App API request failed", { path, status: response.status });
-    throw new HttpError(502, "GITHUB_APP_API_FAILED", "GitHub could not verify the installation.");
+    console.error("GitHub App API request failed", {
+      path,
+      status: response.status,
+    });
+    throw new HttpError(
+      502,
+      "GITHUB_APP_API_FAILED",
+      "GitHub could not verify the installation.",
+    );
   }
 
   return await response.json() as T;
 }
 
-export async function createInstallationToken(installationId: number): Promise<string> {
+export async function createInstallationToken(
+  installationId: number,
+): Promise<string> {
   const result = await githubAppRequest<{ token?: string }>(
     "/app/installations/" + installationId + "/access_tokens",
     "POST",
     {},
   );
-  if (!result.token) throw new HttpError(502, "GITHUB_TOKEN_MISSING", "GitHub did not issue an installation token.");
+  if (!result.token) {
+    throw new HttpError(
+      502,
+      "GITHUB_TOKEN_MISSING",
+      "GitHub did not issue an installation token.",
+    );
+  }
   return result.token;
 }
 
@@ -74,8 +96,15 @@ export async function githubInstallationRequest<T>(
   });
 
   if (!response.ok) {
-    console.error("GitHub installation API request failed", { path, status: response.status });
-    throw new HttpError(502, "GITHUB_INSTALLATION_API_FAILED", "GitHub repository data could not be loaded.");
+    console.error("GitHub installation API request failed", {
+      path,
+      status: response.status,
+    });
+    throw new HttpError(
+      502,
+      "GITHUB_INSTALLATION_API_FAILED",
+      "GitHub repository data could not be loaded.",
+    );
   }
 
   const linkHeader = response.headers.get("link") ?? "";

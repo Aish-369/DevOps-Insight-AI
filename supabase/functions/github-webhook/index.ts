@@ -17,7 +17,9 @@ function objectAt(value: unknown, key: string): JsonObject {
 
 function numberAt(value: unknown, key: string): number | null {
   const raw = isObject(value) ? value[key] : undefined;
-  return typeof raw === "number" && Number.isSafeInteger(raw) && raw > 0 ? raw : null;
+  return typeof raw === "number" && Number.isSafeInteger(raw) && raw > 0
+    ? raw
+    : null;
 }
 
 function stringAt(value: unknown, key: string): string | null {
@@ -56,7 +58,11 @@ async function queueAlerts(
   branch: string | null,
   conclusion: string | null,
 ): Promise<void> {
-  const kind = conclusion === "failure" ? "failure" : conclusion === "success" ? "recovered" : null;
+  const kind = conclusion === "failure"
+    ? "failure"
+    : conclusion === "success"
+    ? "recovered"
+    : null;
   if (!kind) return;
 
   const { data: rules } = await admin
@@ -66,9 +72,13 @@ async function queueAlerts(
     .maybeSingle();
 
   const ruleBranches = Array.isArray(rules?.branches)
-    ? rules.branches.filter((value): value is string => typeof value === "string")
+    ? rules.branches.filter((value): value is string =>
+      typeof value === "string"
+    )
     : [];
-  if (ruleBranches.length > 0 && (!branch || !ruleBranches.includes(branch))) return;
+  if (ruleBranches.length > 0 && (!branch || !ruleBranches.includes(branch))) {
+    return;
+  }
   if (kind === "recovered" && rules?.notify_recovered === false) return;
 
   const { data: channels } = await admin
@@ -92,7 +102,9 @@ async function queueAlerts(
     onConflict: "team_id,dedupe_key",
     ignoreDuplicates: true,
   });
-  if (error) console.error("Could not queue alert deliveries", { code: error.code });
+  if (error) {
+    console.error("Could not queue alert deliveries", { code: error.code });
+  }
 }
 
 async function processWorkflowRun(
@@ -103,7 +115,13 @@ async function processWorkflowRun(
 ): Promise<void> {
   const run = objectAt(payload, "workflow_run");
   const runId = numberAt(run, "id");
-  if (!runId) throw new HttpError(400, "INVALID_WORKFLOW_RUN", "Webhook workflow run identifier is missing.");
+  if (!runId) {
+    throw new HttpError(
+      400,
+      "INVALID_WORKFLOW_RUN",
+      "Webhook workflow run identifier is missing.",
+    );
+  }
 
   const runAttempt = Math.max(1, numberAt(run, "run_attempt") ?? 1);
   const status = stringAt(run, "status");
@@ -129,7 +147,13 @@ async function processWorkflowRun(
     github_updated_at: stringAt(run, "updated_at"),
   }, { onConflict: "github_run_id" });
 
-  if (error) throw new HttpError(500, "WORKFLOW_RUN_SAVE_FAILED", "Workflow run data could not be saved.");
+  if (error) {
+    throw new HttpError(
+      500,
+      "WORKFLOW_RUN_SAVE_FAILED",
+      "Workflow run data could not be saved.",
+    );
+  }
   if (status === "completed") {
     await queueAlerts(admin, teamId, runId, runAttempt, branch, conclusion);
   }
@@ -143,7 +167,13 @@ async function processWorkflowJob(
   const job = objectAt(payload, "workflow_job");
   const jobId = numberAt(job, "id");
   const runId = numberAt(job, "run_id");
-  if (!jobId || !runId) throw new HttpError(400, "INVALID_WORKFLOW_JOB", "Webhook workflow job identifiers are missing.");
+  if (!jobId || !runId) {
+    throw new HttpError(
+      400,
+      "INVALID_WORKFLOW_JOB",
+      "Webhook workflow job identifiers are missing.",
+    );
+  }
 
   const { data: parentRun, error: parentError } = await admin
     .from("workflow_runs")
@@ -153,11 +183,17 @@ async function processWorkflowJob(
     .maybeSingle();
 
   if (parentError || !parentRun) {
-    throw new HttpError(409, "WORKFLOW_RUN_NOT_FOUND", "The parent workflow run has not been synchronized yet.");
+    throw new HttpError(
+      409,
+      "WORKFLOW_RUN_NOT_FOUND",
+      "The parent workflow run has not been synchronized yet.",
+    );
   }
 
   const steps = Array.isArray(job.steps) ? job.steps : [];
-  const failedStep = steps.find((step) => isObject(step) && step.conclusion === "failure");
+  const failedStep = steps.find((step) =>
+    isObject(step) && step.conclusion === "failure"
+  );
   const { error } = await admin.from("workflow_jobs").upsert({
     github_job_id: jobId,
     team_id: teamId,
@@ -165,12 +201,20 @@ async function processWorkflowJob(
     name: stringAt(job, "name") ?? "GitHub Actions job",
     status: stringAt(job, "status"),
     conclusion: stringAt(job, "conclusion"),
-    failed_step_name: isObject(failedStep) ? stringAt(failedStep, "name") : null,
+    failed_step_name: isObject(failedStep)
+      ? stringAt(failedStep, "name")
+      : null,
     started_at: stringAt(job, "started_at"),
     completed_at: stringAt(job, "completed_at"),
   }, { onConflict: "github_job_id" });
 
-  if (error) throw new HttpError(500, "WORKFLOW_JOB_SAVE_FAILED", "Workflow job data could not be saved.");
+  if (error) {
+    throw new HttpError(
+      500,
+      "WORKFLOW_JOB_SAVE_FAILED",
+      "Workflow job data could not be saved.",
+    );
+  }
 }
 
 async function processActivity(
@@ -189,21 +233,27 @@ async function processActivity(
 
   if (eventType === "push") {
     const commits = Array.isArray(payload.commits) ? payload.commits : [];
-    const lastCommit = commits.length > 0 && isObject(commits[commits.length - 1])
-      ? commits[commits.length - 1]
-      : {};
+    const lastCommit =
+      commits.length > 0 && isObject(commits[commits.length - 1])
+        ? commits[commits.length - 1]
+        : {};
     kind = "push";
     title = stringAt(lastCommit, "message") ?? "Push received";
     actor = stringAt(objectAt(payload, "pusher"), "name");
     const repository = objectAt(payload, "repository");
     const commitSha = stringAt(payload, "after");
     const repositoryUrl = stringAt(repository, "html_url");
-    url = commitSha && repositoryUrl ? repositoryUrl + "/commit/" + commitSha : repositoryUrl;
+    url = commitSha && repositoryUrl
+      ? repositoryUrl + "/commit/" + commitSha
+      : repositoryUrl;
     occurredAt = stringAt(lastCommit, "timestamp") ?? occurredAt;
   } else if (eventType === "pull_request") {
     const action = stringAt(payload, "action");
     const pullRequest = objectAt(payload, "pull_request");
-    if (action === "opened" || (action === "closed" && pullRequest.merged === true)) {
+    if (
+      action === "opened" ||
+      (action === "closed" && pullRequest.merged === true)
+    ) {
       kind = action === "opened" ? "pr_opened" : "pr_merged";
       title = stringAt(pullRequest, "title") ?? "Pull request";
       actor = stringAt(objectAt(pullRequest, "user"), "login");
@@ -225,7 +275,13 @@ async function processActivity(
     delivery_id: deliveryId,
   }, { onConflict: "delivery_id,kind", ignoreDuplicates: true });
 
-  if (error) throw new HttpError(500, "ACTIVITY_SAVE_FAILED", "Repository activity could not be saved.");
+  if (error) {
+    throw new HttpError(
+      500,
+      "ACTIVITY_SAVE_FAILED",
+      "Repository activity could not be saved.",
+    );
+  }
 }
 
 Deno.serve(async (request: Request) => {
@@ -248,11 +304,16 @@ Deno.serve(async (request: Request) => {
     request.headers.get("x-hub-signature-256"),
     secret,
   );
-  if (!signatureOk) return jsonResponse(request, { error: "INVALID_SIGNATURE" }, 401);
+  if (!signatureOk) {
+    return jsonResponse(request, { error: "INVALID_SIGNATURE" }, 401);
+  }
 
   const deliveryId = request.headers.get("x-github-delivery") ?? "";
   const eventType = request.headers.get("x-github-event") ?? "";
-  if (!deliveryId || deliveryId.length > 100 || !eventType || eventType.length > 100) {
+  if (
+    !deliveryId || deliveryId.length > 100 || !eventType ||
+    eventType.length > 100
+  ) {
     return jsonResponse(request, { error: "INVALID_WEBHOOK_HEADERS" }, 400);
   }
 
@@ -273,13 +334,20 @@ Deno.serve(async (request: Request) => {
   try {
     admin = createAdminClient();
   } catch {
-    return jsonResponse(request, { error: "WEBHOOK_SERVER_NOT_CONFIGURED" }, 503);
+    return jsonResponse(
+      request,
+      { error: "WEBHOOK_SERVER_NOT_CONFIGURED" },
+      503,
+    );
   }
 
   const installationId = numberAt(objectAt(payload, "installation"), "id");
   const repositoryId = numberAt(objectAt(payload, "repository"), "id");
   const digest = await crypto.subtle.digest("SHA-256", rawBody);
-  const payloadHash = Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, "0")).join("");
+  const payloadHash = Array.from(
+    new Uint8Array(digest),
+    (value) => value.toString(16).padStart(2, "0"),
+  ).join("");
 
   const { error: deliveryError } = await admin.from("webhook_events").insert({
     delivery_id: deliveryId,
@@ -291,27 +359,48 @@ Deno.serve(async (request: Request) => {
     status: "received",
   });
 
-  if (deliveryError?.code === "23505") return jsonResponse(request, { ok: true, duplicate: true });
-  if (deliveryError) return jsonResponse(request, { error: "WEBHOOK_RECEIVE_FAILED" }, 500);
+  if (deliveryError?.code === "23505") {
+    return jsonResponse(request, { ok: true, duplicate: true });
+  }
+  if (deliveryError) {
+    return jsonResponse(request, { error: "WEBHOOK_RECEIVE_FAILED" }, 500);
+  }
 
   try {
     if (eventType === "installation") {
       const action = stringAt(payload, "action");
-      if (installationId && (action === "deleted" || action === "suspend" || action === "unsuspend")) {
+      if (
+        installationId &&
+        (action === "deleted" || action === "suspend" || action === "unsuspend")
+      ) {
         const changes = action === "deleted"
           ? { deleted_at: new Date().toISOString() }
           : action === "suspend"
           ? { suspended_at: new Date().toISOString() }
           : { suspended_at: null };
-        const { error } = await admin.from("github_installations").update(changes).eq("installation_id", installationId);
-        if (error) throw new HttpError(500, "INSTALLATION_STATE_UPDATE_FAILED", "Installation status could not be updated.");
+        const { error } = await admin.from("github_installations").update(
+          changes,
+        ).eq("installation_id", installationId);
+        if (error) {
+          throw new HttpError(
+            500,
+            "INSTALLATION_STATE_UPDATE_FAILED",
+            "Installation status could not be updated.",
+          );
+        }
       }
-      await admin.from("webhook_events").update({ status: "processed", processed_at: new Date().toISOString() }).eq("delivery_id", deliveryId);
+      await admin.from("webhook_events").update({
+        status: "processed",
+        processed_at: new Date().toISOString(),
+      }).eq("delivery_id", deliveryId);
       return jsonResponse(request, { ok: true });
     }
 
     if (!installationId) {
-      await admin.from("webhook_events").update({ status: "unmatched", last_error: "INSTALLATION_ID_MISSING" }).eq("delivery_id", deliveryId);
+      await admin.from("webhook_events").update({
+        status: "unmatched",
+        last_error: "INSTALLATION_ID_MISSING",
+      }).eq("delivery_id", deliveryId);
       return jsonResponse(request, { ok: true, unmatched: true });
     }
 
@@ -323,26 +412,67 @@ Deno.serve(async (request: Request) => {
       .maybeSingle();
 
     if (installationError || !installation) {
-      await admin.from("webhook_events").update({ status: "unmatched", last_error: "INSTALLATION_NOT_MAPPED" }).eq("delivery_id", deliveryId);
+      await admin.from("webhook_events").update({
+        status: "unmatched",
+        last_error: "INSTALLATION_NOT_MAPPED",
+      }).eq("delivery_id", deliveryId);
       return jsonResponse(request, { ok: true, unmatched: true });
     }
 
     if (eventType === "workflow_run") {
-      if (!repositoryId || !(await repositoryBelongsToTeam(admin, repositoryId, installation.team_id))) {
-        throw new HttpError(409, "REPOSITORY_NOT_MAPPED", "Repository mapping is not available yet.");
+      if (
+        !repositoryId ||
+        !(await repositoryBelongsToTeam(
+          admin,
+          repositoryId,
+          installation.team_id,
+        ))
+      ) {
+        throw new HttpError(
+          409,
+          "REPOSITORY_NOT_MAPPED",
+          "Repository mapping is not available yet.",
+        );
       }
-      await processWorkflowRun(admin, installation.team_id, repositoryId, payload);
+      await processWorkflowRun(
+        admin,
+        installation.team_id,
+        repositoryId,
+        payload,
+      );
     } else if (eventType === "workflow_job") {
       await processWorkflowJob(admin, installation.team_id, payload);
     } else if (eventType === "push" || eventType === "pull_request") {
-      if (!repositoryId || !(await repositoryBelongsToTeam(admin, repositoryId, installation.team_id))) {
-        throw new HttpError(409, "REPOSITORY_NOT_MAPPED", "Repository mapping is not available yet.");
+      if (
+        !repositoryId ||
+        !(await repositoryBelongsToTeam(
+          admin,
+          repositoryId,
+          installation.team_id,
+        ))
+      ) {
+        throw new HttpError(
+          409,
+          "REPOSITORY_NOT_MAPPED",
+          "Repository mapping is not available yet.",
+        );
       }
-      await processActivity(admin, installation.team_id, repositoryId, deliveryId, eventType, payload);
+      await processActivity(
+        admin,
+        installation.team_id,
+        repositoryId,
+        deliveryId,
+        eventType,
+        payload,
+      );
     }
 
     await admin.from("webhook_events")
-      .update({ status: "processed", processed_at: new Date().toISOString(), last_error: null })
+      .update({
+        status: "processed",
+        processed_at: new Date().toISOString(),
+        last_error: null,
+      })
       .eq("delivery_id", deliveryId);
 
     return jsonResponse(request, { ok: true });

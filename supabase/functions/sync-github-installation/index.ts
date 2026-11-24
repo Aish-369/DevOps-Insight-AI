@@ -1,6 +1,16 @@
-import { assertAllowedOrigin, handleError, HttpError, jsonResponse, preflight, readJsonObject } from "../_shared/http.ts";
+import {
+  assertAllowedOrigin,
+  handleError,
+  HttpError,
+  jsonResponse,
+  preflight,
+  readJsonObject,
+} from "../_shared/http.ts";
 import { requireAuth, requireTeamRole, writeAudit } from "../_shared/auth.ts";
-import { createInstallationToken, githubInstallationRequest } from "../_shared/github.ts";
+import {
+  createInstallationToken,
+  githubInstallationRequest,
+} from "../_shared/github.ts";
 
 type GithubRepository = {
   id: number;
@@ -22,16 +32,27 @@ Deno.serve(async (request: Request) => {
   try {
     assertAllowedOrigin(request);
     if (request.method !== "POST") {
-      throw new HttpError(405, "METHOD_NOT_ALLOWED", "Use POST for this operation.");
+      throw new HttpError(
+        405,
+        "METHOD_NOT_ALLOWED",
+        "Use POST for this operation.",
+      );
     }
 
     const context = await requireAuth(request);
     const body = await readJsonObject(request);
     const teamId = typeof body.team_id === "string" ? body.team_id : "";
     const installationId = Number(body.installation_id);
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(teamId) ||
-        !Number.isSafeInteger(installationId) || installationId <= 0) {
-      throw new HttpError(400, "INVALID_REQUEST", "A valid team and installation ID are required.");
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+        .test(teamId) ||
+      !Number.isSafeInteger(installationId) || installationId <= 0
+    ) {
+      throw new HttpError(
+        400,
+        "INVALID_REQUEST",
+        "A valid team and installation ID are required.",
+      );
     }
 
     await requireTeamRole(context, teamId);
@@ -45,7 +66,11 @@ Deno.serve(async (request: Request) => {
       .maybeSingle();
 
     if (error || !installation) {
-      throw new HttpError(404, "INSTALLATION_NOT_FOUND", "The active GitHub installation was not found for this team.");
+      throw new HttpError(
+        404,
+        "INSTALLATION_NOT_FOUND",
+        "The active GitHub installation was not found for this team.",
+      );
     }
 
     const token = await createInstallationToken(installationId);
@@ -60,7 +85,11 @@ Deno.serve(async (request: Request) => {
       );
       const pageRepositories = result.data.repositories ?? [];
       if (!Array.isArray(pageRepositories)) {
-        throw new HttpError(502, "GITHUB_REPOSITORY_RESPONSE_INVALID", "GitHub returned an invalid repository list.");
+        throw new HttpError(
+          502,
+          "GITHUB_REPOSITORY_RESPONSE_INVALID",
+          "GitHub returned an invalid repository list.",
+        );
       }
       expectedTotal = Number.isSafeInteger(result.data.total_count)
         ? result.data.total_count
@@ -71,7 +100,11 @@ Deno.serve(async (request: Request) => {
     }
 
     if (repositories.length < expectedTotal && page > 50) {
-      throw new HttpError(502, "GITHUB_REPOSITORY_LIMIT", "The installation has too many repositories for one sync operation.");
+      throw new HttpError(
+        502,
+        "GITHUB_REPOSITORY_LIMIT",
+        "The installation has too many repositories for one sync operation.",
+      );
     }
 
     const syncedAt = new Date().toISOString();
@@ -91,7 +124,13 @@ Deno.serve(async (request: Request) => {
       const { error: saveError } = await context.admin
         .from("team_repositories")
         .upsert(rows, { onConflict: "github_repo_id" });
-      if (saveError) throw new HttpError(500, "REPOSITORY_SYNC_FAILED", "Repository data could not be saved.");
+      if (saveError) {
+        throw new HttpError(
+          500,
+          "REPOSITORY_SYNC_FAILED",
+          "Repository data could not be saved.",
+        );
+      }
     }
 
     const { error: reconcileError } = await context.admin
@@ -99,12 +138,24 @@ Deno.serve(async (request: Request) => {
       .update({ last_reconciled_at: syncedAt })
       .eq("installation_id", installationId)
       .eq("team_id", teamId);
-    if (reconcileError) throw new HttpError(500, "INSTALLATION_UPDATE_FAILED", "Installation sync status could not be saved.");
+    if (reconcileError) {
+      throw new HttpError(
+        500,
+        "INSTALLATION_UPDATE_FAILED",
+        "Installation sync status could not be saved.",
+      );
+    }
 
-    await writeAudit(context.admin, teamId, context.user.id, "github.repositories.synced", {
-      installation_id: installationId,
-      repository_count: rows.length,
-    });
+    await writeAudit(
+      context.admin,
+      teamId,
+      context.user.id,
+      "github.repositories.synced",
+      {
+        installation_id: installationId,
+        repository_count: rows.length,
+      },
+    );
 
     return jsonResponse(request, {
       ok: true,

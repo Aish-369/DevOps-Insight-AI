@@ -19,12 +19,17 @@ export async function sendEmail(
   });
 
   if (!response.ok) {
-    console.error("Email provider rejected a message", { status: response.status });
+    console.error("Email provider rejected a message", {
+      status: response.status,
+    });
     throw new Error("Email delivery failed.");
   }
 
   const result: unknown = await response.json();
-  if (typeof result !== "object" || result === null || !("id" in result) || typeof result.id !== "string") {
+  if (
+    typeof result !== "object" || result === null || !("id" in result) ||
+    typeof result.id !== "string"
+  ) {
     throw new Error("Email provider returned an invalid response.");
   }
   return result.id;

@@ -34,7 +34,8 @@ Deno.test("constantTimeEqual compares matching and mismatching inputs", () => {
 });
 
 Deno.test("redactSecrets removes common GitHub credentials and bearer values", () => {
-  const input = "token=ghp_123456789012345678901234567890 and Authorization: Bearer abcdefghijklmnopqrstuv";
+  const input =
+    "token=ghp_123456789012345678901234567890 and Authorization: Bearer abcdefghijklmnopqrstuv";
   const redacted = redactSecrets(input);
   assertEquals(redacted.includes("ghp_123"), false);
   assertEquals(redacted.includes("abcdefghijklmnopqrstuv"), false);

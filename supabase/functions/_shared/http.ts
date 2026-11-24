@@ -1,5 +1,6 @@
 const DEFAULT_HEADERS = {
-  "access-control-allow-headers": "authorization, apikey, content-type, x-client-info",
+  "access-control-allow-headers":
+    "authorization, apikey, content-type, x-client-info",
   "access-control-allow-methods": "GET, POST, OPTIONS",
   "access-control-max-age": "600",
   "vary": "Origin",
@@ -64,7 +65,11 @@ export function jsonResponse(
 export function assertAllowedOrigin(request: Request): void {
   const origin = request.headers.get("origin") ?? "";
   if (origin && !isAllowedOrigin(origin)) {
-    throw new HttpError(403, "ORIGIN_NOT_ALLOWED", "This request origin is not allowed.");
+    throw new HttpError(
+      403,
+      "ORIGIN_NOT_ALLOWED",
+      "This request origin is not allowed.",
+    );
   }
 }
 
@@ -81,20 +86,33 @@ export class HttpError extends Error {
 
 export function handleError(request: Request, error: unknown): Response {
   if (error instanceof HttpError) {
-    return jsonResponse(request, { error: error.code, message: error.message }, error.status);
+    return jsonResponse(
+      request,
+      { error: error.code, message: error.message },
+      error.status,
+    );
   }
   // Do not send database/provider response bodies or stack traces to browsers.
   return jsonResponse(
     request,
-    { error: "INTERNAL_ERROR", message: "The request could not be completed. Please try again." },
+    {
+      error: "INTERNAL_ERROR",
+      message: "The request could not be completed. Please try again.",
+    },
     500,
   );
 }
 
-export async function readJsonObject(request: Request): Promise<Record<string, unknown>> {
+export async function readJsonObject(
+  request: Request,
+): Promise<Record<string, unknown>> {
   const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
   if (!contentType.includes("application/json")) {
-    throw new HttpError(415, "UNSUPPORTED_MEDIA_TYPE", "Send a JSON request body.");
+    throw new HttpError(
+      415,
+      "UNSUPPORTED_MEDIA_TYPE",
+      "Send a JSON request body.",
+    );
   }
 
   const raw = await request.text();
@@ -106,11 +124,19 @@ export async function readJsonObject(request: Request): Promise<Record<string, u
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new HttpError(400, "INVALID_JSON", "The request body is not valid JSON.");
+    throw new HttpError(
+      400,
+      "INVALID_JSON",
+      "The request body is not valid JSON.",
+    );
   }
 
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new HttpError(400, "INVALID_BODY", "The request body must be a JSON object.");
+    throw new HttpError(
+      400,
+      "INVALID_BODY",
+      "The request body must be a JSON object.",
+    );
   }
 
   return parsed as Record<string, unknown>;

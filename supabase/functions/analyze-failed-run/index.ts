@@ -1,6 +1,13 @@
 import { createInstallationToken } from "../_shared/github.ts";
 import { requireAuth, requireTeamRole, writeAudit } from "../_shared/auth.ts";
-import { handleError, HttpError, jsonResponse, preflight, readJsonObject, assertAllowedOrigin } from "../_shared/http.ts";
+import {
+  assertAllowedOrigin,
+  handleError,
+  HttpError,
+  jsonResponse,
+  preflight,
+  readJsonObject,
+} from "../_shared/http.ts";
 import { redactSecrets, sha256Hex } from "../_shared/security.ts";
 import { unzipSync } from "fflate";
 
@@ -8,13 +15,17 @@ const MAX_LOG_ARCHIVE_BYTES = 20 * 1024 * 1024;
 const MAX_LOG_TEXT_CHARS = 120_000;
 const MAX_LOG_ENTRY_BYTES = 1_000_000;
 
-
 function requiredEnv(name: string): string {
   const value = Deno.env.get(name)?.trim();
-  if (!value) throw new HttpError(503, "AI_PROVIDER_NOT_CONFIGURED", "AI analysis is not configured.");
+  if (!value) {
+    throw new HttpError(
+      503,
+      "AI_PROVIDER_NOT_CONFIGURED",
+      "AI analysis is not configured.",
+    );
+  }
   return value;
 }
-
 
 async function fetchRunLogs(
   installationId: number,
@@ -23,7 +34,8 @@ async function fetchRunLogs(
 ): Promise<string> {
   const token = await createInstallationToken(installationId);
   const response = await fetch(
-    "https://api.github.com/repos/" + repository + "/actions/runs/" + runId + "/logs",
+    "https://api.github.com/repos/" + repository + "/actions/runs/" + runId +
+      "/logs",
     {
       headers: {
         authorization: "Bearer " + token,
@@ -35,27 +47,47 @@ async function fetchRunLogs(
   );
 
   if (!response.ok) {
-    console.error("GitHub run logs request failed", { status: response.status, runId });
-    throw new HttpError(502, "GITHUB_LOGS_UNAVAILABLE", "GitHub workflow logs are not available for this run.");
+    console.error("GitHub run logs request failed", {
+      status: response.status,
+      runId,
+    });
+    throw new HttpError(
+      502,
+      "GITHUB_LOGS_UNAVAILABLE",
+      "GitHub workflow logs are not available for this run.",
+    );
   }
 
   const contentLength = Number(response.headers.get("content-length") ?? "0");
   if (contentLength > MAX_LOG_ARCHIVE_BYTES) {
-    throw new HttpError(413, "GITHUB_LOG_ARCHIVE_TOO_LARGE", "The workflow log archive exceeds the analysis size limit.");
+    throw new HttpError(
+      413,
+      "GITHUB_LOG_ARCHIVE_TOO_LARGE",
+      "The workflow log archive exceeds the analysis size limit.",
+    );
   }
 
   const archive = new Uint8Array(await response.arrayBuffer());
   if (archive.byteLength === 0 || archive.byteLength > MAX_LOG_ARCHIVE_BYTES) {
-    throw new HttpError(413, "GITHUB_LOG_ARCHIVE_TOO_LARGE", "The workflow log archive is empty or exceeds the analysis size limit.");
+    throw new HttpError(
+      413,
+      "GITHUB_LOG_ARCHIVE_TOO_LARGE",
+      "The workflow log archive is empty or exceeds the analysis size limit.",
+    );
   }
 
   let files: Record<string, Uint8Array>;
   try {
     files = unzipSync(archive, {
-      filter: (file) => file.originalSize <= MAX_LOG_ENTRY_BYTES && /\.txt$/i.test(file.name),
+      filter: (file) =>
+        file.originalSize <= MAX_LOG_ENTRY_BYTES && /\.txt$/i.test(file.name),
     });
   } catch {
-    throw new HttpError(502, "GITHUB_LOG_ARCHIVE_INVALID", "GitHub returned an unreadable workflow log archive.");
+    throw new HttpError(
+      502,
+      "GITHUB_LOG_ARCHIVE_INVALID",
+      "GitHub returned an unreadable workflow log archive.",
+    );
   }
 
   const parts: string[] = [];
@@ -72,7 +104,11 @@ async function fetchRunLogs(
   }
 
   if (parts.length === 0) {
-    throw new HttpError(422, "GITHUB_LOGS_EMPTY", "This workflow run does not contain readable text logs.");
+    throw new HttpError(
+      422,
+      "GITHUB_LOGS_EMPTY",
+      "This workflow run does not contain readable text logs.",
+    );
   }
 
   return redactSecrets(parts.join("\n\n")).slice(-MAX_LOG_TEXT_CHARS);
@@ -85,18 +121,31 @@ Deno.serve(async (request: Request) => {
   try {
     assertAllowedOrigin(request);
     if (request.method !== "POST") {
-      throw new HttpError(405, "METHOD_NOT_ALLOWED", "Use POST for this operation.");
+      throw new HttpError(
+        405,
+        "METHOD_NOT_ALLOWED",
+        "Use POST for this operation.",
+      );
     }
 
     const context = await requireAuth(request);
     const body = await readJsonObject(request);
     const teamId = typeof body.team_id === "string" ? body.team_id : "";
     const runId = Number(body.run_id);
-    const jobId = body.job_id === undefined || body.job_id === null ? null : Number(body.job_id);
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(teamId) ||
-        !Number.isSafeInteger(runId) || runId <= 0 ||
-        (jobId !== null && (!Number.isSafeInteger(jobId) || jobId <= 0))) {
-      throw new HttpError(400, "INVALID_REQUEST", "A valid team, run and optional job ID are required.");
+    const jobId = body.job_id === undefined || body.job_id === null
+      ? null
+      : Number(body.job_id);
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+        .test(teamId) ||
+      !Number.isSafeInteger(runId) || runId <= 0 ||
+      (jobId !== null && (!Number.isSafeInteger(jobId) || jobId <= 0))
+    ) {
+      throw new HttpError(
+        400,
+        "INVALID_REQUEST",
+        "A valid team, run and optional job ID are required.",
+      );
     }
 
     await requireTeamRole(context, teamId, ["owner", "admin", "member"]);
@@ -111,9 +160,19 @@ Deno.serve(async (request: Request) => {
       .eq("github_run_id", runId)
       .maybeSingle();
 
-    if (runError || !run) throw new HttpError(404, "WORKFLOW_RUN_NOT_FOUND", "The workflow run was not found for this team.");
+    if (runError || !run) {
+      throw new HttpError(
+        404,
+        "WORKFLOW_RUN_NOT_FOUND",
+        "The workflow run was not found for this team.",
+      );
+    }
     if (run.status !== "completed" || run.conclusion === "success") {
-      throw new HttpError(409, "RUN_NOT_ANALYZABLE", "Only completed unsuccessful workflow runs can be analyzed.");
+      throw new HttpError(
+        409,
+        "RUN_NOT_ANALYZABLE",
+        "Only completed unsuccessful workflow runs can be analyzed.",
+      );
     }
 
     let installationId = 0;
@@ -124,7 +183,13 @@ Deno.serve(async (request: Request) => {
       .eq("github_repo_id", run.github_repo_id)
       .maybeSingle();
 
-    if (repoError || !repository) throw new HttpError(404, "REPOSITORY_NOT_FOUND", "The repository installation was not found.");
+    if (repoError || !repository) {
+      throw new HttpError(
+        404,
+        "REPOSITORY_NOT_FOUND",
+        "The repository installation was not found.",
+      );
+    }
     installationId = Number(repository.installation_id);
 
     let job: Record<string, unknown> | null = null;
@@ -136,7 +201,13 @@ Deno.serve(async (request: Request) => {
         .eq("github_run_id", runId)
         .eq("github_job_id", jobId)
         .maybeSingle();
-      if (error || !data) throw new HttpError(404, "WORKFLOW_JOB_NOT_FOUND", "The workflow job was not found for this team run.");
+      if (error || !data) {
+        throw new HttpError(
+          404,
+          "WORKFLOW_JOB_NOT_FOUND",
+          "The workflow job was not found for this team run.",
+        );
+      }
       job = data as Record<string, unknown>;
     }
 
@@ -148,36 +219,74 @@ Deno.serve(async (request: Request) => {
       .eq("team_id", teamId)
       .maybeSingle();
     const configuredDailyCap = rules?.daily_ai_cap;
-    const dailyCap = typeof configuredDailyCap === "number" && Number.isSafeInteger(configuredDailyCap)
+    const dailyCap = typeof configuredDailyCap === "number" &&
+        Number.isSafeInteger(configuredDailyCap)
       ? configuredDailyCap
       : 30;
-    if (dailyCap <= 0) throw new HttpError(429, "AI_DAILY_CAP_DISABLED", "AI analysis is disabled for this team by its daily limit.");
+    if (dailyCap <= 0) {
+      throw new HttpError(
+        429,
+        "AI_DAILY_CAP_DISABLED",
+        "AI analysis is disabled for this team by its daily limit.",
+      );
+    }
 
     const { count, error: countError } = await context.admin
       .from("failure_analyses")
       .select("id", { count: "exact", head: true })
       .eq("team_id", teamId)
       .gte("created_at", today.toISOString());
-    if (countError) throw new HttpError(500, "AI_USAGE_LOOKUP_FAILED", "AI usage could not be checked.");
-    if ((count ?? 0) >= dailyCap) throw new HttpError(429, "AI_DAILY_CAP_REACHED", "This team has reached its daily AI analysis limit.");
+    if (countError) {
+      throw new HttpError(
+        500,
+        "AI_USAGE_LOOKUP_FAILED",
+        "AI usage could not be checked.",
+      );
+    }
+    if ((count ?? 0) >= dailyCap) {
+      throw new HttpError(
+        429,
+        "AI_DAILY_CAP_REACHED",
+        "This team has reached its daily AI analysis limit.",
+      );
+    }
 
-    const logText = await fetchRunLogs(installationId, repository.full_name, runId);
-    const signature = await sha256Hex([teamId, runId, jobId ?? "all", logText].join(":"));
+    const logText = await fetchRunLogs(
+      installationId,
+      repository.full_name,
+      runId,
+    );
+    const signature = await sha256Hex(
+      [teamId, runId, jobId ?? "all", logText].join(":"),
+    );
     const { data: previous } = await context.admin
       .from("failure_analyses")
-      .select("id,category,cause,fix_steps,evidence,confidence,model,created_at")
+      .select(
+        "id,category,cause,fix_steps,evidence,confidence,model,created_at",
+      )
       .eq("team_id", teamId)
       .eq("signature", signature)
       .eq("status", "done")
       .maybeSingle();
 
     if (previous) {
-      return jsonResponse(request, { ok: true, reused: true, analysis: previous });
+      return jsonResponse(request, {
+        ok: true,
+        reused: true,
+        analysis: previous,
+      });
     }
 
     const endpoint = new URL(apiUrl);
-    if (endpoint.protocol !== "https:" && endpoint.hostname !== "localhost" && endpoint.hostname !== "127.0.0.1") {
-      throw new HttpError(503, "AI_ENDPOINT_INVALID", "AI provider endpoint must use HTTPS.");
+    if (
+      endpoint.protocol !== "https:" && endpoint.hostname !== "localhost" &&
+      endpoint.hostname !== "127.0.0.1"
+    ) {
+      throw new HttpError(
+        503,
+        "AI_ENDPOINT_INVALID",
+        "AI provider endpoint must use HTTPS.",
+      );
     }
 
     const systemPrompt = [
@@ -193,7 +302,8 @@ Deno.serve(async (request: Request) => {
       "Workflow run ID: " + runId,
       "Commit SHA: " + String(run.head_sha ?? "unknown"),
       "Workflow job: " + (job ? String(job.name ?? "unknown") : "all jobs"),
-      "Failed step: " + (job ? String(job.failed_step_name ?? "not specified") : "not specified"),
+      "Failed step: " +
+      (job ? String(job.failed_step_name ?? "not specified") : "not specified"),
       "Conclusion: " + String(job?.conclusion ?? run.conclusion ?? "unknown"),
       "",
       "Untrusted, redacted workflow logs begin:",
@@ -203,7 +313,10 @@ Deno.serve(async (request: Request) => {
 
     const response = await fetch(endpoint.toString(), {
       method: "POST",
-      headers: { authorization: "Bearer " + apiKey, "content-type": "application/json" },
+      headers: {
+        authorization: "Bearer " + apiKey,
+        "content-type": "application/json",
+      },
       body: JSON.stringify({
         model,
         temperature: 0.1,
@@ -216,34 +329,56 @@ Deno.serve(async (request: Request) => {
 
     if (!response.ok) {
       console.error("AI provider request failed", { status: response.status });
-      throw new HttpError(502, "AI_PROVIDER_FAILED", "The AI analysis provider could not complete the request.");
+      throw new HttpError(
+        502,
+        "AI_PROVIDER_FAILED",
+        "The AI analysis provider could not complete the request.",
+      );
     }
 
     const providerResult: unknown = await response.json();
-    const choices = typeof providerResult === "object" && providerResult !== null && "choices" in providerResult
-      ? (providerResult as { choices?: unknown }).choices
+    const choices =
+      typeof providerResult === "object" && providerResult !== null &&
+        "choices" in providerResult
+        ? (providerResult as { choices?: unknown }).choices
+        : null;
+    const firstChoice = Array.isArray(choices) && choices.length > 0
+      ? choices[0]
       : null;
-    const firstChoice = Array.isArray(choices) && choices.length > 0 ? choices[0] : null;
-    const message = typeof firstChoice === "object" && firstChoice !== null && "message" in firstChoice
+    const message = typeof firstChoice === "object" && firstChoice !== null &&
+        "message" in firstChoice
       ? (firstChoice as { message?: unknown }).message
       : null;
-    const content = typeof message === "object" && message !== null && "content" in message
-      ? (message as { content?: unknown }).content
-      : null;
-    if (typeof content !== "string") throw new HttpError(502, "AI_RESPONSE_INVALID", "The AI analysis provider returned no response content.");
+    const content =
+      typeof message === "object" && message !== null && "content" in message
+        ? (message as { content?: unknown }).content
+        : null;
+    if (typeof content !== "string") {
+      throw new HttpError(
+        502,
+        "AI_RESPONSE_INVALID",
+        "The AI analysis provider returned no response content.",
+      );
+    }
 
     const analysis = parseAnalysis(content);
-    const usage = typeof providerResult === "object" && providerResult !== null && "usage" in providerResult
-      ? (providerResult as { usage?: unknown }).usage
-      : null;
-    const tokensIn = typeof usage === "object" && usage !== null && "prompt_tokens" in usage
-      ? Number((usage as { prompt_tokens?: unknown }).prompt_tokens)
-      : null;
-    const tokensOut = typeof usage === "object" && usage !== null && "completion_tokens" in usage
+    const usage =
+      typeof providerResult === "object" && providerResult !== null &&
+        "usage" in providerResult
+        ? (providerResult as { usage?: unknown }).usage
+        : null;
+    const tokensIn =
+      typeof usage === "object" && usage !== null && "prompt_tokens" in usage
+        ? Number((usage as { prompt_tokens?: unknown }).prompt_tokens)
+        : null;
+    const tokensOut = typeof usage === "object" && usage !== null &&
+        "completion_tokens" in usage
       ? Number((usage as { completion_tokens?: unknown }).completion_tokens)
       : null;
 
-    const { data: saved, error: saveError } = await context.admin.from("failure_analyses").insert({
+    const { data: saved, error: saveError } = await context.admin.from(
+      "failure_analyses",
+    ).insert({
       team_id: teamId,
       github_run_id: runId,
       github_job_id: jobId,
@@ -256,20 +391,42 @@ Deno.serve(async (request: Request) => {
       confidence: analysis.confidence,
       model,
       prompt_version: "ci-triage-v1",
-      tokens_in: Number.isSafeInteger(tokensIn) && (tokensIn ?? -1) >= 0 ? tokensIn : null,
-      tokens_out: Number.isSafeInteger(tokensOut) && (tokensOut ?? -1) >= 0 ? tokensOut : null,
+      tokens_in: Number.isSafeInteger(tokensIn) && (tokensIn ?? -1) >= 0
+        ? tokensIn
+        : null,
+      tokens_out: Number.isSafeInteger(tokensOut) && (tokensOut ?? -1) >= 0
+        ? tokensOut
+        : null,
       completed_at: new Date().toISOString(),
-    }).select("id,category,cause,fix_steps,evidence,confidence,model,created_at").single();
+    }).select(
+      "id,category,cause,fix_steps,evidence,confidence,model,created_at",
+    ).single();
 
-    if (saveError || !saved) throw new HttpError(500, "ANALYSIS_SAVE_FAILED", "The analysis result could not be saved.");
+    if (saveError || !saved) {
+      throw new HttpError(
+        500,
+        "ANALYSIS_SAVE_FAILED",
+        "The analysis result could not be saved.",
+      );
+    }
 
-    await writeAudit(context.admin, teamId, context.user.id, "ai.failure_analysis.completed", {
-      analysis_id: saved.id,
-      github_run_id: runId,
-      confidence: analysis.confidence,
-    });
+    await writeAudit(
+      context.admin,
+      teamId,
+      context.user.id,
+      "ai.failure_analysis.completed",
+      {
+        analysis_id: saved.id,
+        github_run_id: runId,
+        confidence: analysis.confidence,
+      },
+    );
 
-    return jsonResponse(request, { ok: true, reused: false, analysis: saved }, 201);
+    return jsonResponse(
+      request,
+      { ok: true, reused: false, analysis: saved },
+      201,
+    );
   } catch (error) {
     return handleError(request, error);
   }
@@ -282,30 +439,52 @@ function parseAnalysis(content: string): {
   evidence: string[];
   confidence: "high" | "medium" | "low";
 } {
-  const cleaned = content.trim().replace(/^\u0060\u0060\u0060(?:json)?\s*/i, "").replace(/\s*\u0060\u0060\u0060$/, "");
+  const cleaned = content.trim().replace(/^\u0060\u0060\u0060(?:json)?\s*/i, "")
+    .replace(/\s*\u0060\u0060\u0060$/, "");
   let parsed: unknown;
   try {
     parsed = JSON.parse(cleaned);
   } catch {
-    throw new HttpError(502, "AI_RESPONSE_INVALID", "The analysis provider returned an invalid response.");
+    throw new HttpError(
+      502,
+      "AI_RESPONSE_INVALID",
+      "The analysis provider returned an invalid response.",
+    );
   }
   if (typeof parsed !== "object" || parsed === null) {
-    throw new HttpError(502, "AI_RESPONSE_INVALID", "The analysis provider returned an invalid response.");
+    throw new HttpError(
+      502,
+      "AI_RESPONSE_INVALID",
+      "The analysis provider returned an invalid response.",
+    );
   }
 
   const value = parsed as Record<string, unknown>;
-  const category = typeof value.category === "string" ? value.category.trim().slice(0, 80) : "";
-  const cause = typeof value.cause === "string" ? value.cause.trim().slice(0, 2_000) : "";
+  const category = typeof value.category === "string"
+    ? value.category.trim().slice(0, 80)
+    : "";
+  const cause = typeof value.cause === "string"
+    ? value.cause.trim().slice(0, 2_000)
+    : "";
   const confidence = value.confidence;
   const fixSteps = Array.isArray(value.fix_steps)
-    ? value.fix_steps.filter((step): step is string => typeof step === "string").slice(0, 10).map((step) => step.slice(0, 500))
+    ? value.fix_steps.filter((step): step is string => typeof step === "string")
+      .slice(0, 10).map((step) => step.slice(0, 500))
     : [];
   const evidence = Array.isArray(value.evidence)
-    ? value.evidence.filter((item): item is string => typeof item === "string").slice(0, 10).map((item) => item.slice(0, 500))
+    ? value.evidence.filter((item): item is string => typeof item === "string")
+      .slice(0, 10).map((item) => item.slice(0, 500))
     : [];
 
-  if (!category || !cause || (confidence !== "high" && confidence !== "medium" && confidence !== "low")) {
-    throw new HttpError(502, "AI_RESPONSE_INVALID", "The analysis provider response did not match the expected schema.");
+  if (
+    !category || !cause ||
+    (confidence !== "high" && confidence !== "medium" && confidence !== "low")
+  ) {
+    throw new HttpError(
+      502,
+      "AI_RESPONSE_INVALID",
+      "The analysis provider response did not match the expected schema.",
+    );
   }
   return { category, cause, fix_steps: fixSteps, evidence, confidence };
 }
