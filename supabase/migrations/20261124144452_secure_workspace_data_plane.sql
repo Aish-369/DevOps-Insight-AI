@@ -138,6 +138,59 @@ ALTER TABLE public.profiles
 CREATE INDEX IF NOT EXISTS teams_owner_id_idx ON public.teams(owner_id);
 CREATE INDEX IF NOT EXISTS team_projects_created_by_idx ON public.team_projects(created_by);
 
+
+-- Serialize owner demotions/removals so a team cannot lose its last owner.
+CREATE OR REPLACE FUNCTION private.prevent_last_team_owner()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $function$
+DECLARE
+  target_team_id uuid;
+  remaining_owners integer;
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    IF NEW.team_id IS DISTINCT FROM OLD.team_id OR NEW.user_id IS DISTINCT FROM OLD.user_id THEN
+      RAISE EXCEPTION 'Team membership identity cannot be changed';
+    END IF;
+    target_team_id := OLD.team_id;
+    IF OLD.role <> 'owner' OR NEW.role = 'owner' THEN
+      RETURN NEW;
+    END IF;
+  ELSE
+    target_team_id := OLD.team_id;
+    IF OLD.role <> 'owner' THEN
+      RETURN OLD;
+    END IF;
+  END IF;
+
+  PERFORM 1 FROM public.teams t WHERE t.id = target_team_id FOR UPDATE;
+
+  SELECT count(*) INTO remaining_owners
+  FROM public.team_members tm
+  WHERE tm.team_id = target_team_id
+    AND tm.role = 'owner'
+    AND tm.user_id <> OLD.user_id;
+
+  IF remaining_owners = 0 THEN
+    RAISE EXCEPTION 'A team must retain at least one owner';
+  END IF;
+
+  IF TG_OP = 'DELETE' THEN
+    RETURN OLD;
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.prevent_last_team_owner() FROM PUBLIC, anon, authenticated;
+DROP TRIGGER IF EXISTS team_members_prevent_last_owner ON public.team_members;
+CREATE TRIGGER team_members_prevent_last_owner
+BEFORE UPDATE OR DELETE ON public.team_members
+FOR EACH ROW
+EXECUTE FUNCTION private.prevent_last_team_owner();
+
 -- GitHub App installation is mapped to one team at a time.
 CREATE TABLE public.github_installations (
   installation_id bigint PRIMARY KEY,

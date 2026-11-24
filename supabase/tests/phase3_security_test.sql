@@ -34,6 +34,12 @@ BEGIN
   IF has_table_privilege('authenticated', 'public.team_invitations', 'INSERT') THEN
     RAISE EXCEPTION 'authenticated unexpectedly has INSERT on team_invitations';
   END IF;
+  IF has_table_privilege('authenticated', 'public.team_members', 'DELETE') THEN
+    RAISE EXCEPTION 'authenticated unexpectedly has DELETE on team_members';
+  END IF;
+  IF has_function_privilege('authenticated', 'private.prevent_last_team_owner()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'authenticated can execute the owner guard function directly';
+  END IF;
   IF has_table_privilege('authenticated', 'public.webhook_events', 'SELECT') THEN
     RAISE EXCEPTION 'authenticated unexpectedly has SELECT on webhook_events';
   END IF;
@@ -90,7 +96,32 @@ BEGIN
     RAISE EXCEPTION 'duplicate profiles foreign key remains';
   END IF;
 END
-$$;
+$;
+
+-- The owner invariant is enforced by a trigger even for service-role mutations.
+DO $
+DECLARE
+  owner_count integer;
+BEGIN
+  SELECT count(*) INTO owner_count
+  FROM public.team_members
+  WHERE team_id = '10000000-0000-0000-0000-000000000001' AND role = 'owner';
+  IF owner_count <> 1 THEN
+    RAISE EXCEPTION 'Fixture must begin with exactly one owner';
+  END IF;
+  BEGIN
+    DELETE FROM public.team_members
+    WHERE team_id = '10000000-0000-0000-0000-000000000001'
+      AND user_id = '00000000-0000-0000-0000-000000000001'
+      AND role = 'owner';
+    RAISE EXCEPTION 'Last owner deletion was not blocked';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM <> 'A team must retain at least one owner' THEN
+      RAISE;
+    END IF;
+  END;
+END
+$;
 
 INSERT INTO auth.users(id, email) VALUES
   ('00000000-0000-0000-0000-000000000001', 'owner-one@example.test'),
