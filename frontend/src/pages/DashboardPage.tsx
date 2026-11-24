@@ -8,6 +8,7 @@ import {
   LogOut,
   RefreshCw,
   ShieldCheck,
+  Settings,
   Workflow,
 } from "lucide-react";
 
