@@ -61,3 +61,20 @@
   .platform-header,.platform-list-row { flex-direction:column; align-items:stretch; }
   .platform-card { padding:18px; }
 }
+
+.platform-run-card { padding: 16px 0; border-top: 1px solid #eff0f5; }
+.platform-run-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.platform-run-heading p { margin:5px 0 3px; }
+.platform-run-heading small { color:#9298aa; font-size:10px; }
+.platform-status { display:inline-flex; align-items:center; padding:5px 9px; border-radius:999px; font-size:10px; font-weight:800; text-transform:capitalize; white-space:nowrap; }
+.platform-status-success { background:#e8f6ee; color:#2d8154; }
+.platform-status-failure { background:#fff0ee; color:#b44b4b; }
+.platform-status-running { background:#edf2ff; color:#536cbd; }
+.platform-status-neutral { background:#f1f2f6; color:#6b7183; }
+.platform-analysis { margin-top:13px; padding:14px; border-radius:12px; background:#f8f9fc; }
+.platform-analysis p { margin:9px 0; color:#545b70; }
+.platform-analysis h3 { margin:12px 0 6px; color:#51566a; font-size:11px; font-weight:800; text-transform:uppercase; }
+.platform-analysis ul,.platform-analysis ol { margin:0; padding-left:20px; color:#60677b; font-size:12px; line-height:1.7; }
+.platform-inline-form { display:grid; gap:10px; margin-top:14px; padding:14px; border:1px solid #eef0f6; border-radius:12px; }
+.platform-checkbox { display:flex!important; align-items:center; gap:9px!important; }
+.platform-checkbox input { width:auto!important; min-height:unset!important; }

@@ -122,15 +122,20 @@ export default function AlertsSettingsPage() {
       return;
     }
     try {
-      const { error: saveError } = await supabase.from("alert_rules").upsert({
-        team_id: teamId,
+      const ruleValues = {
         branches,
         notify_recovered: notifyRecovered,
         skip_flaky: skipFlaky,
         daily_ai_cap: dailyCap,
         updated_at: new Date().toISOString(),
-      }, { onConflict: "team_id" });
-      if (saveError) throw saveError;
+      };
+      const { data: existingRule, error: lookupError } = await supabase
+        .from("alert_rules").select("team_id").eq("team_id", teamId).maybeSingle();
+      if (lookupError) throw lookupError;
+      const saveResult = existingRule
+        ? await supabase.from("alert_rules").update(ruleValues).eq("team_id", teamId)
+        : await supabase.from("alert_rules").insert({ ...ruleValues, team_id: teamId });
+      if (saveResult.error) throw saveResult.error;
       setNotice("Alert rules saved.");
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Unable to save alert rules.");

@@ -9,6 +9,8 @@ import {
   RefreshCw,
   ShieldCheck,
   Settings,
+  Users,
+  Bell,
   Workflow,
 } from "lucide-react";
 
@@ -293,6 +295,18 @@ export default function DashboardPage() {
             <span>Activity Audit</span>
           </Link>
 
+          <Link to="/teams" className="dashboard-nav-item">
+            <Users size={19} /><span>Teams</span>
+          </Link>
+          <Link to="/integrations" className="dashboard-nav-item">
+            <GitBranch size={19} /><span>GitHub App</span>
+          </Link>
+          <Link to="/workflow-runs" className="dashboard-nav-item">
+            <Workflow size={19} /><span>Workflow Runs</span>
+          </Link>
+          <Link to="/settings/alerts" className="dashboard-nav-item">
+            <Bell size={19} /><span>Alerts</span>
+          </Link>
           <Link
             to="/settings/account"
             className="dashboard-nav-item"

@@ -17,6 +17,8 @@ import TeamsPage from "./pages/TeamsPage";
 import AcceptInvitationPage from "./pages/AcceptInvitationPage";
 import IntegrationsPage from "./pages/IntegrationsPage";
 import GithubInstallationCallbackPage from "./pages/GithubInstallationCallbackPage";
+import WorkflowRunsPage from "./pages/WorkflowRunsPage";
+import AlertsSettingsPage from "./pages/AlertsSettingsPage";
 
 // Protect pages that require user login.
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -31,9 +33,13 @@ export default function App() {
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
+      <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
 
       <Route path="/integrations" element={<ProtectedRoute><IntegrationsPage /></ProtectedRoute>} />
       <Route path="/integrations/github/callback" element={<ProtectedRoute><GithubInstallationCallbackPage /></ProtectedRoute>} />
+
+      <Route path="/workflow-runs" element={<ProtectedRoute><WorkflowRunsPage /></ProtectedRoute>} />
+      <Route path="/settings/alerts" element={<ProtectedRoute><AlertsSettingsPage /></ProtectedRoute>} />
 
       <Route
         path="/settings/account"
