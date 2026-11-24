@@ -39,6 +39,7 @@ export default function DashboardPage() {
 
   // Store logout errors.
   const [logoutError, setLogoutError] = useState("");
+  const [platformStats, setPlatformStats] = useState({ teams: "—", runs: "—", alerts: "—" });
 
   // Load the GitHub username from the signed-in user's Supabase profile.
   const {
@@ -86,6 +87,38 @@ export default function DashboardPage() {
     return () => {
       active = false;
     };
+  }, []);
+
+  // Load team-scoped platform counters; keep them unavailable until the migration is deployed.
+  useEffect(() => {
+    let active = true;
+    async function loadPlatformStats() {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData.user) return;
+
+      const { data: teamRows, error: teamError } = await supabase.from("teams").select("id");
+      if (!active || teamError || !teamRows) return;
+      const teamIds = teamRows.map((team) => team.id);
+      if (teamIds.length === 0) {
+        setPlatformStats({ teams: "0", runs: "0", alerts: "0" });
+        return;
+      }
+
+      const [runResult, alertResult] = await Promise.all([
+        supabase.from("workflow_runs").select("github_run_id", { count: "exact", head: true }).in("team_id", teamIds),
+        supabase.from("alerts_sent").select("id", { count: "exact", head: true }).in("team_id", teamIds).in("status", ["pending", "failed"]),
+      ]);
+      if (!active) return;
+      setPlatformStats({
+        teams: String(teamRows.length),
+        runs: runResult.error ? "—" : String(runResult.count ?? 0),
+        alerts: alertResult.error ? "—" : String(alertResult.count ?? 0),
+      });
+    }
+    void loadPlatformStats().catch(() => {
+      if (active) setPlatformStats({ teams: "—", runs: "—", alerts: "—" });
+    });
+    return () => { active = false; };
   }, []);
 
   // Get the first available public repository.
@@ -224,17 +257,17 @@ export default function DashboardPage() {
     },
     {
       label: "Pipeline Runs",
-      value: "—",
+      value: platformStats.runs,
       icon: Workflow,
     },
     {
       label: "Active Alerts",
-      value: "—",
+      value: platformStats.alerts,
       icon: Activity,
     },
     {
       label: "Connected Teams",
-      value: "—",
+      value: platformStats.teams,
       icon: ShieldCheck,
     },
   ];

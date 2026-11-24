@@ -19,7 +19,6 @@ export default function AlertsSettingsPage() {
   const [verificationCode, setVerificationCode] = useState("");
   const [branchesText, setBranchesText] = useState("");
   const [notifyRecovered, setNotifyRecovered] = useState(true);
-  const [skipFlaky, setSkipFlaky] = useState(true);
   const [dailyCap, setDailyCap] = useState(30);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -61,12 +60,10 @@ export default function AlertsSettingsPage() {
       if (rule) {
         setBranchesText(Array.isArray(rule.branches) ? rule.branches.join(", ") : "");
         setNotifyRecovered(Boolean(rule.notify_recovered));
-        setSkipFlaky(Boolean(rule.skip_flaky));
         setDailyCap(Number(rule.daily_ai_cap ?? 30));
       } else {
         setBranchesText("");
         setNotifyRecovered(true);
-        setSkipFlaky(true);
         setDailyCap(30);
       }
     } catch (loadError) {
@@ -125,7 +122,7 @@ export default function AlertsSettingsPage() {
       const ruleValues = {
         branches,
         notify_recovered: notifyRecovered,
-        skip_flaky: skipFlaky,
+        skip_flaky: false,
         daily_ai_cap: dailyCap,
         updated_at: new Date().toISOString(),
       };
@@ -204,7 +201,6 @@ export default function AlertsSettingsPage() {
             <label htmlFor="alert-branches">Branches (comma separated; blank means all branches)</label>
             <input id="alert-branches" value={branchesText} onChange={(event) => setBranchesText(event.target.value)} placeholder="main, release/*" />
             <label className="platform-checkbox"><input type="checkbox" checked={notifyRecovered} onChange={(event) => setNotifyRecovered(event.target.checked)} /> Notify when a workflow recovers</label>
-            <label className="platform-checkbox"><input type="checkbox" checked={skipFlaky} onChange={(event) => setSkipFlaky(event.target.checked)} /> Skip flaky failures</label>
             <label htmlFor="daily-ai-cap">Daily AI analysis limit per team</label>
             <input id="daily-ai-cap" type="number" min={0} max={500} value={dailyCap} onChange={(event) => setDailyCap(Number(event.target.value))} />
             <button type="button" onClick={() => void saveRules()} disabled={saving}>Save rules</button>

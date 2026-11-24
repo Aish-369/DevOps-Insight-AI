@@ -27,6 +27,11 @@ export default function AcceptInvitationPage() {
         setSignedIn(true);
         setEmail(data.user.email ?? "");
       }
+    }).catch(() => {
+      if (active) {
+        setSignedIn(false);
+        setEmail("");
+      }
     }).finally(() => {
       if (active) setChecking(false);
     });

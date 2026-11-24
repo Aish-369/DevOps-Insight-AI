@@ -33,7 +33,6 @@ export default function App() {
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
-      <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
 
       <Route path="/integrations" element={<ProtectedRoute><IntegrationsPage /></ProtectedRoute>} />
       <Route path="/integrations/github/callback" element={<ProtectedRoute><GithubInstallationCallbackPage /></ProtectedRoute>} />

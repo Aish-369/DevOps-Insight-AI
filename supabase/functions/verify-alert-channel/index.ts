@@ -311,7 +311,7 @@ Deno.serve(async (request: Request) => {
     return jsonResponse(request, {
       ok: true,
       verification_required: true,
-      channel_id: channel.id,
+      channel_id: channelId,
       expires_at: expiresAt,
     }, 201);
   } catch (error) {
