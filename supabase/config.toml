@@ -1,0 +1,40 @@
+project_id = "devops-insight-ai"
+
+[api]
+enabled = true
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions", "private"]
+max_rows = 1000
+
+[db]
+major_version = 17
+
+[db.migrations]
+enabled = true
+
+[db.seed]
+enabled = false
+
+[functions.github-webhook]
+verify_jwt = false
+
+[functions.create-team-invitation]
+verify_jwt = false
+
+[functions.accept-team-invitation]
+verify_jwt = false
+
+[functions.create-github-installation-link]
+verify_jwt = false
+
+[functions.complete-github-installation]
+verify_jwt = false
+
+[functions.sync-github-installation]
+verify_jwt = false
+
+[functions.analyze-failed-run]
+verify_jwt = false
+
+[functions.dispatch-alerts]
+verify_jwt = false

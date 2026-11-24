@@ -1,0 +1,57 @@
+name: Database Security CI
+
+on:
+  push:
+    branches:
+      - codex/phase3-platform-backend-2026-11-24
+  pull_request:
+    branches:
+      - codex/phase2-auth-lifecycle-2026-11-24
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-security-integration:
+    name: PostgreSQL RLS and privilege integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: devops_insight_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d devops_insight_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      - name: Create minimal Supabase Auth test primitives
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/devops_insight_test
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/fixtures/auth_bootstrap.sql
+      - name: Build the verified existing schema snapshot
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/devops_insight_test
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261112100118_create_team_workspace_foundation.sql
+      - name: Apply the new security and monitoring migration
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/devops_insight_test
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124144452_secure_workspace_data_plane.sql
+      - name: Verify least privilege, RLS isolation and owner trigger
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/devops_insight_test
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/phase3_security_test.sql

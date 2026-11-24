@@ -8,35 +8,9 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: phase3-migration-bootstrap
-  cancel-in-progress: false
-
 jobs:
   generate-migration-file:
+    if: false
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
-      - name: Checkout phase branch
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: true
-          fetch-depth: 0
-      - name: Setup Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: "22.16.0"
-          package-manager-cache: false
-      - name: Verify Supabase CLI and generate migration filename
-        run: |
-          npx --yes supabase@3.0.0 --version
-          npx --yes supabase@3.0.0 migration new secure_workspace_data_plane
-          find supabase/migrations -maxdepth 1 -type f -name '*_secure_workspace_data_plane.sql' -print
-          test "$(find supabase/migrations -maxdepth 1 -type f -name '*_secure_workspace_data_plane.sql' | wc -l)" -eq 1
-      - name: Commit generated migration file
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add supabase/migrations
-          git commit -m "chore: generate phase 3 migration with Supabase CLI"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+      - run: echo "One-time migration filename bootstrap; intentionally disabled after use."
