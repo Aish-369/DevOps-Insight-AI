@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Activity,
@@ -193,16 +193,17 @@ export default function DashboardPage() {
   async function handleLogout() {
     setLogoutError("");
 
-    const { error: signOutError } =
-      await supabase.auth.signOut();
-
-    if (signOutError) {
-      setLogoutError(signOutError.message);
-      return;
+    try {
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) throw signOutError;
+      navigate("/login", { replace: true });
+    } catch (signOutError: unknown) {
+      setLogoutError(
+        signOutError instanceof Error
+          ? signOutError.message
+          : "Unable to sign out. Please try again.",
+      );
     }
-
-    // Return to the login page after signing out.
-    navigate("/login", { replace: true });
   }
 
   // Prepare the dashboard statistics.
@@ -289,6 +290,14 @@ export default function DashboardPage() {
           >
             <Activity size={19} />
             <span>Activity Audit</span>
+          </Link>
+
+          <Link
+            to="/settings/account"
+            className="dashboard-nav-item"
+          >
+            <Settings size={19} />
+            <span>Account settings</span>
           </Link>
         </nav>
 

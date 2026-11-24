@@ -1,8 +1,12 @@
-﻿import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 // Import authentication pages.
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
+import AuthCallbackPage from "./pages/AuthCallbackPage";
+import AccountSettingsPage from "./pages/AccountSettingsPage";
 
 // Import application pages.
 import DashboardPage from "./pages/DashboardPage";
@@ -20,6 +24,9 @@ export default function App() {
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
       <Route
         path="/dashboard"

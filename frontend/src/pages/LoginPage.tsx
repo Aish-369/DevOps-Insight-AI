@@ -45,7 +45,7 @@ export default function LoginPage() {
     try {
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "github",
-        options: { redirectTo: `${window.location.origin}/dashboard` },
+        options: { redirectTo: `${window.location.origin}/auth/callback?next=/dashboard` },
       });
       if (oauthError) throw oauthError;
     } catch (oauthError: unknown) {
@@ -165,6 +165,9 @@ export default function LoginPage() {
               </button>
             </div>
 
+            <p className="forgot-password-row">
+              <Link className="forgot-password-link" to="/forgot-password">Forgot password?</Link>
+            </p>
             {error && <p className="login-error" role="alert">{error}</p>}
 
             <button type="submit" className="sign-in-button" disabled={loading || oauthLoading}>

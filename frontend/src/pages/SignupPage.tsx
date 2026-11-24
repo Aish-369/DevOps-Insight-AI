@@ -51,6 +51,8 @@ export default function SignupPage() {
           data: {
             full_name: name.trim(),
           },
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+          },
         },
       });
 
@@ -62,7 +64,7 @@ export default function SignupPage() {
       } else {
         // Email verification may be enabled in Supabase.
         setSuccess(
-          "Account created! Please check your email for verification."
+          "If this address can be registered, verification instructions will be sent. Check your inbox and spam folder."
         );
       }
     } catch (signupRequestError: unknown) {
