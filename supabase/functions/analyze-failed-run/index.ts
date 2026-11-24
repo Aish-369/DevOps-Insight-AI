@@ -8,13 +8,6 @@ const MAX_LOG_ARCHIVE_BYTES = 20 * 1024 * 1024;
 const MAX_LOG_TEXT_CHARS = 120_000;
 const MAX_LOG_ENTRY_BYTES = 1_000_000;
 
-type AnalysisResult = {
-  category: string;
-  cause: string;
-  fix_steps: string[];
-  evidence: string[];
-  confidence: "high" | "medium" | "low";
-};
 
 function requiredEnv(name: string): string {
   const value = Deno.env.get(name)?.trim();
@@ -22,36 +15,6 @@ function requiredEnv(name: string): string {
   return value;
 }
 
-function readAnalysisResult(content: string): AnalysisResult {
-  let parsed: unknown;
-  const cleaned = content.trim().replace(/^\u0060\u0060\u0060(?:json)?\s*/i, "").replace(/\s*\u0060\u0060\u0060$/, "");
-  try {
-    parsed = JSON.parse(cleaned);
-  } catch {
-    throw new HttpError(502, "AI_RESPONSE_INVALID", "The analysis provider returned an invalid response.");
-  }
-
-  if (typeof parsed !== "object" || parsed === null) {
-    throw new HttpError(502, "AI_RESPONSE_INVALID", "The analysis provider returned an invalid response.");
-  }
-
-  const value = parsed as Record<string, unknown>;
-  const category = typeof value.category === "string" ? value.category.trim().slice(0, 80) : "";
-  const cause = typeof value.cause === "string" ? value.cause.trim().slice(0, 2_000) : "";
-  const confidence = value.confidence;
-  const fixSteps = Array.isArray(value.fix_steps)
-    ? value.fix_steps.filter((step): step is string => typeof step === "string").slice(0, 10).map((step) => step.slice(0, 500))
-    : [];
-  const evidence = Array.isArray(value.evidence)
-    ? value.evidence.filter((item): item is string => typeof item === "string").slice(0, 10).map((item) => item.slice(0, 500))
-    : [];
-
-  if (!category || !cause || (confidence !== "high" && confidence !== "medium" && confidence !== "low")) {
-    throw new HttpError(502, "AI_RESPONSE_INVALID", "The analysis provider response did not match the expected schema.");
-  }
-
-  return { category, cause, fix_steps: fixSteps, evidence, confidence };
-}
 
 async function fetchRunLogs(
   installationId: number,

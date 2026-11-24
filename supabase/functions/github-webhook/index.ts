@@ -1,5 +1,5 @@
 import { createAdminClient } from "../_shared/auth.ts";
-import { handleError, HttpError, jsonResponse } from "../_shared/http.ts";
+import { HttpError, jsonResponse } from "../_shared/http.ts";
 import { verifyGithubWebhookSignature } from "../_shared/webhook-security.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 

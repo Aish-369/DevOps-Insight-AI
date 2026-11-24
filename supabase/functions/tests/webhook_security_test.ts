@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert@1.0.14";
+import { assertEquals } from "@std/assert";
 import { verifyGithubWebhookSignature } from "../_shared/webhook-security.ts";
 
 Deno.test("GitHub webhook signature validates the exact raw body", async () => {

@@ -1,4 +1,4 @@
-import { assertEquals, assertMatch, assertNotEquals } from "jsr:@std/assert@1.0.14";
+import { assertEquals, assertMatch, assertNotEquals } from "@std/assert";
 import {
   constantTimeEqual,
   randomNumericCode,
