@@ -41,3 +41,9 @@ verify_jwt = false
 
 [functions.verify-alert-channel]
 verify_jwt = false
+
+[functions.manage-team-member]
+verify_jwt = false
+
+[functions.revoke-team-invitation]
+verify_jwt = false
