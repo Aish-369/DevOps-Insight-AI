@@ -288,8 +288,7 @@ CREATE TABLE public.activity_events (
 CREATE INDEX activity_events_team_occurred_idx
   ON public.activity_events(team_id, occurred_at DESC);
 CREATE UNIQUE INDEX activity_events_delivery_kind_uidx
-  ON public.activity_events(delivery_id, kind)
-  WHERE delivery_id IS NOT NULL;
+  ON public.activity_events(delivery_id, kind);
 
 -- Raw GitHub webhook bodies are deliberately not persisted.
 CREATE TABLE public.webhook_events (
@@ -365,6 +364,7 @@ CREATE TABLE public.alert_channels (
   verified_at timestamptz,
   verification_code_hash text,
   verification_expires_at timestamptz,
+  verification_attempts integer NOT NULL DEFAULT 0 CHECK (verification_attempts >= 0),
   created_by uuid NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (id, team_id),
@@ -404,6 +404,53 @@ CREATE TABLE public.alerts_sent (
     REFERENCES public.workflow_runs(github_run_id, team_id) ON DELETE CASCADE
 );
 CREATE INDEX alerts_sent_team_created_idx ON public.alerts_sent(team_id, created_at DESC);
+
+CREATE TABLE public.team_ai_usage (
+  team_id uuid NOT NULL REFERENCES public.teams(id) ON DELETE CASCADE,
+  usage_day date NOT NULL DEFAULT current_date,
+  analyses_used integer NOT NULL DEFAULT 0 CHECK (analyses_used >= 0),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (team_id, usage_day)
+);
+ALTER TABLE public.team_ai_usage ENABLE ROW LEVEL SECURITY;
+REVOKE ALL PRIVILEGES ON public.team_ai_usage FROM anon, authenticated;
+GRANT ALL PRIVILEGES ON public.team_ai_usage TO service_role;
+
+CREATE OR REPLACE FUNCTION public.claim_team_ai_analysis(p_team_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $function$
+DECLARE
+  configured_cap integer;
+  claimed boolean;
+BEGIN
+  SELECT ar.daily_ai_cap INTO configured_cap
+  FROM public.alert_rules ar
+  WHERE ar.team_id = p_team_id;
+
+  IF NOT FOUND THEN configured_cap := 30; END IF;
+  IF configured_cap <= 0 THEN RETURN false; END IF;
+
+  INSERT INTO public.team_ai_usage(team_id, usage_day, analyses_used)
+  VALUES (p_team_id, current_date, 0)
+  ON CONFLICT (team_id, usage_day) DO NOTHING;
+
+  UPDATE public.team_ai_usage
+  SET analyses_used = analyses_used + 1,
+      updated_at = now()
+  WHERE team_id = p_team_id
+    AND usage_day = current_date
+    AND analyses_used < configured_cap
+  RETURNING true INTO claimed;
+
+  RETURN COALESCE(claimed, false);
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.claim_team_ai_analysis(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_team_ai_analysis(uuid) TO service_role;
 
 CREATE TABLE public.team_audit_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

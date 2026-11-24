@@ -57,7 +57,7 @@ Deno.serve(async (request: Request) => {
       const { data: channel, error } = await context.admin
         .from("alert_channels")
         .select(
-          "id,team_id,channel_type,target,verified_at,verification_code_hash,verification_expires_at",
+          "id,team_id,channel_type,target,verified_at,verification_code_hash,verification_expires_at,verification_attempts",
         )
         .eq("id", channelId)
         .eq("team_id", teamId)
@@ -90,7 +90,30 @@ Deno.serve(async (request: Request) => {
       const submittedHash = await sha256Hex(
         [teamId, channelId, submittedCode].join(":"),
       );
+      const attempts = Number(channel.verification_attempts ?? 0);
+      if (attempts >= 5) {
+        throw new HttpError(
+          429,
+          "VERIFICATION_ATTEMPTS_EXCEEDED",
+          "Too many incorrect codes. Wait until the code expires, then request a new one.",
+        );
+      }
       if (submittedHash !== channel.verification_code_hash) {
+        const { data: attemptUpdate, error: attemptError } = await context.admin
+          .from("alert_channels")
+          .update({ verification_attempts: attempts + 1 })
+          .eq("id", channelId)
+          .eq("team_id", teamId)
+          .eq("verification_attempts", attempts)
+          .select("id")
+          .maybeSingle();
+        if (attemptError || !attemptUpdate) {
+          throw new HttpError(
+            409,
+            "VERIFICATION_RETRY",
+            "The verification code changed. Try the latest code.",
+          );
+        }
         throw new HttpError(
           400,
           "VERIFICATION_CODE_INCORRECT",
@@ -103,6 +126,7 @@ Deno.serve(async (request: Request) => {
           verified_at: new Date().toISOString(),
           verification_code_hash: null,
           verification_expires_at: null,
+          verification_attempts: 0,
         })
         .eq("id", channelId)
         .eq("team_id", teamId)
@@ -170,47 +194,76 @@ Deno.serve(async (request: Request) => {
 
     const code = randomNumericCode(6);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const normalizedTarget = channelType === "email" ? target.toLowerCase() : target;
 
-    const { data: channel, error: insertError } = await context.admin.from(
-      "alert_channels",
-    ).insert({
-      team_id: teamId,
-      channel_type: channelType,
-      target,
-      created_by: context.user.id,
-      verified_at: null,
-      verification_code_hash: "pending",
-      verification_expires_at: expiresAt,
-    }).select("id").single();
-
-    if (insertError || !channel) {
-      if (insertError?.code === "23505") {
-        throw new HttpError(
-          409,
-          "CHANNEL_ALREADY_EXISTS",
-          "This alert destination has already been added to the team.",
-        );
-      }
-      throw new HttpError(
-        500,
-        "CHANNEL_CREATE_FAILED",
-        "The alert channel could not be created.",
-      );
+    const { data: existingChannel, error: existingError } = await context.admin
+      .from("alert_channels")
+      .select("id,verified_at,verification_expires_at,verification_attempts")
+      .eq("team_id", teamId)
+      .eq("channel_type", channelType)
+      .eq("target", normalizedTarget)
+      .maybeSingle();
+    if (existingError) {
+      throw new HttpError(500, "CHANNEL_LOOKUP_FAILED", "The alert destination could not be checked.");
+    }
+    if (existingChannel?.verified_at) {
+      throw new HttpError(409, "CHANNEL_ALREADY_VERIFIED", "This alert destination is already verified.");
+    }
+    if (
+      existingChannel?.verification_expires_at &&
+      Date.parse(existingChannel.verification_expires_at) > Date.now() &&
+      Number(existingChannel.verification_attempts ?? 0) < 5
+    ) {
+      throw new HttpError(409, "CHANNEL_VERIFICATION_PENDING", "A verification code is already active for this destination.");
     }
 
-    const codeHash = await sha256Hex([teamId, channel.id, code].join(":"));
+    let channelId = existingChannel?.id as string | undefined;
+    let createdNewChannel = false;
+    if (channelId) {
+      const { error: resetError } = await context.admin.from("alert_channels")
+        .update({
+          verification_code_hash: "pending",
+          verification_expires_at: expiresAt,
+          verification_attempts: 0,
+          target: normalizedTarget,
+        })
+        .eq("id", channelId)
+        .eq("team_id", teamId)
+        .is("verified_at", null);
+      if (resetError) throw new HttpError(500, "CHANNEL_RENEW_FAILED", "A new verification request could not be created.");
+    } else {
+      const { data: channel, error: insertError } = await context.admin.from("alert_channels")
+        .insert({
+          team_id: teamId,
+          channel_type: channelType,
+          target: normalizedTarget,
+          created_by: context.user.id,
+          verified_at: null,
+          verification_code_hash: "pending",
+          verification_expires_at: expiresAt,
+          verification_attempts: 0,
+        })
+        .select("id")
+        .single();
+
+      if (insertError || !channel) {
+        if (insertError?.code === "23505") {
+          throw new HttpError(409, "CHANNEL_ALREADY_EXISTS", "This alert destination has already been added to the team.");
+        }
+        throw new HttpError(500, "CHANNEL_CREATE_FAILED", "The alert channel could not be created.");
+      }
+      channelId = channel.id;
+      createdNewChannel = true;
+    }
+
+    const codeHash = await sha256Hex([teamId, channelId, code].join(":"));
     const { error: hashError } = await context.admin.from("alert_channels")
       .update({ verification_code_hash: codeHash })
-      .eq("id", channel.id)
+      .eq("id", channelId)
       .eq("team_id", teamId);
     if (hashError) {
-      await context.admin.from("alert_channels").delete().eq("id", channel.id)
-        .eq("team_id", teamId);
-      throw new HttpError(
-        500,
-        "CHANNEL_CREATE_FAILED",
-        "The alert channel could not be created.",
-      );
+      if (createdNewChannel) await context.admin.from("alert_channels").delete().eq("id", channelId).eq("team_id", teamId);
+      throw new HttpError(500, "CHANNEL_CREATE_FAILED", "The alert channel could not be created.");
     }
 
     try {
@@ -229,8 +282,14 @@ Deno.serve(async (request: Request) => {
         );
       }
     } catch {
-      await context.admin.from("alert_channels").delete().eq("id", channel.id)
-        .eq("team_id", teamId);
+      if (createdNewChannel) {
+        await context.admin.from("alert_channels").delete().eq("id", channelId).eq("team_id", teamId);
+      } else {
+        await context.admin.from("alert_channels").update({
+          verification_code_hash: null,
+          verification_expires_at: null,
+        }).eq("id", channelId).eq("team_id", teamId);
+      }
       throw new HttpError(
         503,
         "VERIFICATION_DELIVERY_FAILED",
@@ -244,7 +303,7 @@ Deno.serve(async (request: Request) => {
       context.user.id,
       "alerts.channel.verification_requested",
       {
-        channel_id: channel.id,
+        channel_id: channelId,
         channel_type: channelType,
       },
     );

@@ -359,10 +359,31 @@ Deno.serve(async (request: Request) => {
     status: "received",
   });
 
+  let deliveryAttempt = 1;
   if (deliveryError?.code === "23505") {
-    return jsonResponse(request, { ok: true, duplicate: true });
-  }
-  if (deliveryError) {
+    const { data: existingDelivery, error: lookupError } = await admin
+      .from("webhook_events")
+      .select("status,attempts")
+      .eq("delivery_id", deliveryId)
+      .maybeSingle();
+    if (lookupError || !existingDelivery) {
+      return jsonResponse(request, { error: "WEBHOOK_DUPLICATE_LOOKUP_FAILED" }, 500);
+    }
+    if (existingDelivery.status === "processed" || existingDelivery.status === "unmatched") {
+      return jsonResponse(request, { ok: true, duplicate: true });
+    }
+    deliveryAttempt = Number(existingDelivery.attempts ?? 0) + 1;
+    const { data: retryClaim, error: retryError } = await admin
+      .from("webhook_events")
+      .update({ status: "received", attempts: deliveryAttempt, last_error: null })
+      .eq("delivery_id", deliveryId)
+      .in("status", ["failed", "received"])
+      .select("delivery_id")
+      .maybeSingle();
+    if (retryError || !retryClaim) {
+      return jsonResponse(request, { ok: true, duplicate: true });
+    }
+  } else if (deliveryError) {
     return jsonResponse(request, { error: "WEBHOOK_RECEIVE_FAILED" }, 500);
   }
 
@@ -479,7 +500,7 @@ Deno.serve(async (request: Request) => {
   } catch (error) {
     await admin.from("webhook_events").update({
       status: "failed",
-      attempts: 1,
+      attempts: deliveryAttempt,
       last_error: error instanceof HttpError ? error.code : "PROCESSING_FAILED",
     }).eq("delivery_id", deliveryId);
     return jsonResponse(request, { error: "WEBHOOK_PROCESSING_FAILED" }, 500);
