@@ -1,0 +1,75 @@
+name: Phase 1 Lockfile Refresh
+
+on:
+  push:
+    branches:
+      - codex/phase1-foundation-2026-11-24
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase1-lockfile-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout working branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22.16.0"
+          package-manager-cache: false
+      - name: Regenerate frontend lockfile and remediate semver-compatible advisories
+        run: |
+          npm --prefix frontend install --package-lock-only --ignore-scripts
+          npm --prefix frontend audit fix --ignore-scripts
+      - name: Synchronize root manifest and lockfile
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const root = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          const frontend = JSON.parse(fs.readFileSync("frontend/package.json", "utf8"));
+          root.dependencies = frontend.dependencies;
+          root.devDependencies = frontend.devDependencies;
+          fs.writeFileSync("package.json", JSON.stringify(root, null, 2) + "\n");
+          NODE
+          cp frontend/package-lock.json package-lock.json
+          cmp --silent package-lock.json frontend/package-lock.json
+      - name: Commit regenerated manifests and lockfiles
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json frontend/package.json frontend/package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: refresh secure frontend dependency lockfiles"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+      - name: Clean installation
+        working-directory: frontend
+        run: npm ci
+      - name: Dependency audit
+        working-directory: frontend
+        run: npm audit --audit-level=moderate
+      - name: Vite security check
+        working-directory: frontend
+        run: npm run security:check
+      - name: Foundation tests
+        working-directory: frontend
+        run: npm test
+      - name: ESLint
+        working-directory: frontend
+        run: npm run lint
+      - name: TypeScript
+        working-directory: frontend
+        run: npm run typecheck
+      - name: Production build
+        working-directory: frontend
+        run: npm run build

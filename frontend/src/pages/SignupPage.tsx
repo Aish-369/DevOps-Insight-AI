@@ -1,6 +1,7 @@
 
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { getErrorMessage } from "../lib/errorMessage";
 import { supabase } from "../lib/supabase";
 
 // Import the matching signup CSS file.
@@ -53,10 +54,7 @@ export default function SignupPage() {
         },
       });
 
-      if (signupError) {
-        setError(signupError.message);
-        return;
-      }
+      if (signupError) throw signupError;
 
       if (data.session) {
         // Redirect when the user is already authenticated.
@@ -67,8 +65,8 @@ export default function SignupPage() {
           "Account created! Please check your email for verification."
         );
       }
-    } catch {
-      setError("Something went wrong. Please try again.");
+    } catch (signupRequestError: unknown) {
+      setError(getErrorMessage(signupRequestError, "Unable to create your account. Please try again."));
     } finally {
       setLoading(false);
     }
