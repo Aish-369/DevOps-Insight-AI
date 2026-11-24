@@ -105,3 +105,35 @@ test("account settings remains protected for signed-out visitors", async ({ page
   await page.goto("/settings/account");
   await expect(page).toHaveURL(/\\/login$/);
 });
+
+test("signup uses the same-origin PKCE callback for email confirmation", async ({ page }) => {
+  let signupBody: Record<string, unknown> | undefined;
+  await page.route(/\/auth\/v1\/signup$/, async (route) => {
+    signupBody = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: "test-user-id",
+        aud: "authenticated",
+        role: "authenticated",
+        email: "new@example.com",
+        app_metadata: { provider: "email", providers: ["email"] },
+        user_metadata: { full_name: "Test User" },
+        identities: [],
+        created_at: "2026-01-01T00:00:00.000Z",
+      }),
+    });
+  });
+
+  await page.goto("/signup");
+  await page.getByLabel("Full name").fill("Test User");
+  await page.getByLabel("Email address").fill("new@example.com");
+  await page.getByLabel("Password", { exact: true }).fill("StrongPassword123!");
+  await page.getByLabel("Confirm password").fill("StrongPassword123!");
+  await page.getByRole("button", { name: "Create account" }).click();
+
+  await expect(page.getByRole("status")).toContainText("If this address can be registered");
+  const options = signupBody?.options as Record<string, unknown> | undefined;
+  expect(options?.emailRedirectTo).toBe("http://127.0.0.1:4173/auth/callback");
+});

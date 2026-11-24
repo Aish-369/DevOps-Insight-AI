@@ -29,6 +29,11 @@ export default function App() {
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
       <Route
+        path="/settings/account"
+        element={<ProtectedRoute><AccountSettingsPage /></ProtectedRoute>}
+      />
+
+      <Route
         path="/dashboard"
         element={<ProtectedRoute><DashboardPage /></ProtectedRoute>}
       />
