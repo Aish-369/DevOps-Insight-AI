@@ -48,7 +48,7 @@ test("signup client validation prevents mismatched passwords from reaching Supab
 });
 
 test("signup provider errors are shown and the submit button recovers", async ({ page }) => {
-  await page.route(/\/auth\/v1\/signup$/, async (route) => {
+  await page.route("**/auth/v1/signup*", async (route) => {
     await route.fulfill({
       status: 400,
       contentType: "application/json",
