@@ -31,7 +31,7 @@ test("login provider errors are shown and the submit button recovers", async ({ 
 
 test("signup client validation prevents mismatched passwords from reaching Supabase", async ({ page }) => {
   let signupRequestCount = 0;
-  await page.route(/\/auth\/v1\/signup$/, async (route) => {
+  await page.route("**/auth/v1/signup*", async (route) => {
     signupRequestCount += 1;
     await route.continue();
   });
