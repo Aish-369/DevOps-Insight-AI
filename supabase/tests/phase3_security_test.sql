@@ -96,7 +96,7 @@ BEGIN
     RAISE EXCEPTION 'duplicate profiles foreign key remains';
   END IF;
 END
-$;
+$$;
 
 INSERT INTO auth.users(id, email) VALUES
   ('00000000-0000-0000-0000-000000000001', 'owner-one@example.test'),
