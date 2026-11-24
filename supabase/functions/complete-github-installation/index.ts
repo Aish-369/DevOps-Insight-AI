@@ -68,17 +68,29 @@ Deno.serve(async (request: Request) => {
 
     await requireTeamRole(context, stateRecord.team_id);
 
-    const { data: existingInstallation, error: existingError } = await context.admin
+    const { data: existingInstallation, error: existingError } = await context
+      .admin
       .from("github_installations")
       .select("installation_id,team_id")
       .eq("installation_id", installationId)
       .maybeSingle();
 
     if (existingError) {
-      throw new HttpError(500, "INSTALLATION_LOOKUP_FAILED", "The GitHub installation could not be checked.");
+      throw new HttpError(
+        500,
+        "INSTALLATION_LOOKUP_FAILED",
+        "The GitHub installation could not be checked.",
+      );
     }
-    if (existingInstallation && existingInstallation.team_id !== stateRecord.team_id) {
-      throw new HttpError(409, "INSTALLATION_ALREADY_LINKED", "This GitHub App installation is already connected to another workspace.");
+    if (
+      existingInstallation &&
+      existingInstallation.team_id !== stateRecord.team_id
+    ) {
+      throw new HttpError(
+        409,
+        "INSTALLATION_ALREADY_LINKED",
+        "This GitHub App installation is already connected to another workspace.",
+      );
     }
 
     const installation = await githubAppRequest<GithubInstallation>(
