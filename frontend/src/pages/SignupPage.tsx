@@ -2,6 +2,8 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getErrorMessage } from "../lib/errorMessage";
+import { supabase } from "../lib/supabase";
+import "../styles/SignupPage.css";
 
 function isDuplicateSignupError(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
