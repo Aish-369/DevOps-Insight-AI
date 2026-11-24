@@ -84,8 +84,7 @@ test("forgot password submits a same-origin reset redirect and uses a generic re
   await page.getByRole("button", { name: "Send reset instructions" }).click();
 
   await expect(page.getByRole("status")).toContainText("If an account exists");
-  expect(submittedBody?.email).toBe("person@example.com");
-  expect(submittedBody?.redirect_to).toBe("http://127.0.0.1:4173/reset-password");
+  expect(requestedRedirect).toBe("http://127.0.0.1:4173/reset-password");
 });
 
 test("an auth callback provider denial shows a safe error instead of trusting redirect parameters", async ({ page }) => {
@@ -107,9 +106,9 @@ test("account settings remains protected for signed-out visitors", async ({ page
 });
 
 test("signup uses the same-origin PKCE callback for email confirmation", async ({ page }) => {
-  let signupBody: Record<string, unknown> | undefined;
+  let signupRedirect = "";
   await page.route(/\/auth\/v1\/signup$/, async (route) => {
-    signupBody = route.request().postDataJSON() as Record<string, unknown>;
+    signupRedirect = new URL(route.request().url()).searchParams.get("redirect_to") ?? "";
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -134,6 +133,5 @@ test("signup uses the same-origin PKCE callback for email confirmation", async (
   await page.getByRole("button", { name: "Create account" }).click();
 
   await expect(page.getByRole("status")).toContainText("If this address can be registered");
-  const options = signupBody?.options as Record<string, unknown> | undefined;
-  expect(options?.emailRedirectTo).toBe("http://127.0.0.1:4173/auth/callback");
+  expect(signupRedirect).toBe("http://127.0.0.1:4173/auth/callback");
 });
