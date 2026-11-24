@@ -13,7 +13,9 @@ export async function verifyGithubWebhookSignature(
     false,
     ["sign"],
   );
-  const digest = await crypto.subtle.sign("HMAC", key, rawBody);
+  const bodyBuffer = new ArrayBuffer(rawBody.byteLength);
+  new Uint8Array(bodyBuffer).set(rawBody);
+  const digest = await crypto.subtle.sign("HMAC", key, bodyBuffer);
   const expected = "sha256=" + bytesToHex(new Uint8Array(digest));
   return constantTimeEqual(expected.toLowerCase(), signatureHeader.toLowerCase());
 }

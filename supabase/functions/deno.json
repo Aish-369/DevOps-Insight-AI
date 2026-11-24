@@ -6,12 +6,17 @@
       "dom",
       "dom.iterable",
       "esnext"
+    ],
+    "skipLibCheck": true,
+    "types": [
+      "@types/node"
     ]
   },
   "imports": {
     "@supabase/supabase-js": "npm:@supabase/supabase-js@2.118.0",
     "jose": "npm:jose@6.1.3",
-    "fflate": "npm:fflate@0.8.2"
+    "fflate": "npm:fflate@0.8.2",
+    "@types/node": "npm:@types/node@24.19.2"
   },
   "tasks": {
     "check": "deno check --all .",

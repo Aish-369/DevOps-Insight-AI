@@ -184,7 +184,10 @@ Deno.serve(async (request: Request) => {
       .select("daily_ai_cap")
       .eq("team_id", teamId)
       .maybeSingle();
-    const dailyCap = Number.isSafeInteger(rules?.daily_ai_cap) ? Number(rules.daily_ai_cap) : 30;
+    const configuredDailyCap = rules?.daily_ai_cap;
+    const dailyCap = typeof configuredDailyCap === "number" && Number.isSafeInteger(configuredDailyCap)
+      ? configuredDailyCap
+      : 30;
     if (dailyCap <= 0) throw new HttpError(429, "AI_DAILY_CAP_DISABLED", "AI analysis is disabled for this team by its daily limit.");
 
     const { count, error: countError } = await context.admin
