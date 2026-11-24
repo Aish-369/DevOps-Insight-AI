@@ -2,9 +2,14 @@ name: Frontend CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - codex/phase1-foundation-2026-11-24
+      - codex/phase2-auth-lifecycle-2026-11-24
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - codex/phase1-foundation-2026-11-24
   workflow_dispatch:
 
 permissions:
