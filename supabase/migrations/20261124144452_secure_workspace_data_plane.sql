@@ -1,5 +1,11 @@
 BEGIN;
 
+-- PostgreSQL grants EXECUTE on new functions to PUBLIC globally by default.
+-- A schema-scoped REVOKE cannot override a global default grant, so revoke it
+-- globally for the migration owner before tightening the per-schema defaults.
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres
+  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+
 -- Secure future objects created by the migration owner in the exposed schema.
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
   REVOKE ALL ON TABLES FROM anon, authenticated;
