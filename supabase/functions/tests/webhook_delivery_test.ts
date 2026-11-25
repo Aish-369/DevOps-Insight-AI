@@ -1,8 +1,6 @@
 import { assertEquals } from "@std/assert";
-import {
-  getWebhookDeliveryDisposition,
-  type ExistingWebhookDelivery,
-} from "../_shared/webhook-delivery.ts";
+import { getWebhookDeliveryDisposition } from "../_shared/webhook-delivery.ts";
+import type { ExistingWebhookDelivery } from "../_shared/webhook-delivery.ts";
 
 const now = Date.parse("2026-11-25T12:00:00.000Z");
 
