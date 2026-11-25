@@ -75,11 +75,18 @@ async function queueAlerts(
     : null;
   if (!kind) return;
 
-  const { data: rules } = await admin
+  const { data: rules, error: rulesError } = await admin
     .from("alert_rules")
     .select("branches,notify_recovered,skip_flaky")
     .eq("team_id", teamId)
     .maybeSingle();
+  if (rulesError) {
+    throw new HttpError(
+      500,
+      "ALERT_RULE_LOOKUP_FAILED",
+      "Alert preferences could not be loaded.",
+    );
+  }
 
   const ruleBranches = Array.isArray(rules?.branches)
     ? rules.branches.filter((value): value is string =>
@@ -94,11 +101,18 @@ async function queueAlerts(
   }
   if (kind === "recovered" && rules?.notify_recovered === false) return;
 
-  const { data: channels } = await admin
+  const { data: channels, error: channelsError } = await admin
     .from("alert_channels")
     .select("id")
     .eq("team_id", teamId)
     .not("verified_at", "is", null);
+  if (channelsError) {
+    throw new HttpError(
+      500,
+      "ALERT_CHANNEL_LOOKUP_FAILED",
+      "Verified alert destinations could not be loaded.",
+    );
+  }
 
   if (!channels?.length) return;
 
@@ -121,7 +135,11 @@ async function queueAlerts(
     ignoreDuplicates: true,
   });
   if (error) {
-    console.error("Could not queue alert deliveries", { code: error.code });
+    throw new HttpError(
+      500,
+      "ALERT_QUEUE_SAVE_FAILED",
+      "Workflow alert deliveries could not be queued.",
+    );
   }
 }
 
