@@ -409,12 +409,15 @@ BEGIN
      OR to_regclass('public.github_installation_states_user_idx') IS NULL
      OR to_regclass('public.github_installations_created_by_idx') IS NULL
      OR to_regclass('public.team_audit_events_actor_user_idx') IS NULL
-     OR to_regclass('public.team_audit_events_subject_user_idx') IS NULL THEN
+     OR to_regclass('public.team_audit_events_subject_user_idx') IS NULL
+     OR to_regclass('public.workflow_run_attempts_run_team_fk_idx') IS NULL THEN
     RAISE EXCEPTION 'One or more Phase 3 foreign-key indexes are missing';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='webhook_events' AND policyname='webhook_events_deny_client')
      OR NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='github_installation_states' AND policyname='github_installation_states_deny_client')
-     OR NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='team_ai_usage' AND policyname='team_ai_usage_deny_client') THEN
+     OR NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='team_ai_usage' AND policyname='team_ai_usage_deny_client')
+     OR NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='workflow_run_attempts' AND policyname='workflow_run_attempts_deny_client')
+     OR NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='pending_workflow_jobs' AND policyname='pending_workflow_jobs_deny_client') THEN
     RAISE EXCEPTION 'Explicit client-deny policies are missing from internal tables';
   END IF;
 END
