@@ -2,6 +2,7 @@ import { createAdminClient } from "../_shared/auth.ts";
 import { HttpError, jsonResponse, readRequestBytes } from "../_shared/http.ts";
 import { verifyGithubWebhookSignature } from "../_shared/webhook-security.ts";
 import { isFlakyWorkflowAttempts } from "../_shared/workflow-attempts.ts";
+import { getActiveRepositoryMapping } from "../_shared/repository-access.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type JsonObject = Record<string, unknown>;
@@ -50,15 +51,16 @@ async function repositoryBelongsToTeam(
   admin: AdminClient,
   repositoryId: number,
   teamId: string,
+  installationId: number,
 ): Promise<boolean> {
-  const { data, error } = await admin
-    .from("team_repositories")
-    .select("github_repo_id")
-    .eq("team_id", teamId)
-    .eq("github_repo_id", repositoryId)
-    .eq("active", true)
-    .maybeSingle();
-  return !error && Boolean(data);
+  return Boolean(
+    await getActiveRepositoryMapping(
+      admin,
+      teamId,
+      repositoryId,
+      installationId,
+    ),
+  );
 }
 
 async function queueAlerts(
@@ -846,6 +848,7 @@ Deno.serve(async (request: Request) => {
           admin,
           repositoryId,
           installation.team_id,
+          installationId,
         ))
       ) {
         throw new HttpError(
@@ -867,6 +870,7 @@ Deno.serve(async (request: Request) => {
           admin,
           repositoryId,
           installation.team_id,
+          installationId,
         ))
       ) {
         throw new HttpError(
@@ -888,6 +892,7 @@ Deno.serve(async (request: Request) => {
           admin,
           repositoryId,
           installation.team_id,
+          installationId,
         ))
       ) {
         throw new HttpError(
