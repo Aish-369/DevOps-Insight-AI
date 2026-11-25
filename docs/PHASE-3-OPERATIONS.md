@@ -15,9 +15,9 @@ The target project's migration history is:
 - `20261125134153_reliable_event_delivery`
 - `20261125134241_index_workflow_run_attempts_fk`
 
-Do not re-run these migrations. The four incremental migrations were applied after a successful transaction/rollback validation. Workspace row counts for teams, members, invitations and projects were zero before and after. No database backup was created during this session; the migration set was additive/security-focused, and the existing workspace tables contained no rows at the time of application.
+Do not re-run these migrations. The four original incremental migrations were applied after a successful transaction/rollback validation. Workspace row counts for teams, members, invitations and projects were zero before and after. No database backup was created during this session; the migration set was additive/security-focused, and the existing workspace tables contained no rows at the time of application.
 
-The migration `20261125112000_reliable_event_delivery.sql` is applied and verified. The follow-up migration `20261125134241_index_workflow_run_attempts_fk.sql` adds the missing composite index for the attempt-history foreign key. The hosted project currently has zero workflow runs and zero alert rows, so the reliability migration's legacy `processing`-alert transition did not alter existing alert data.
+The canonical repository migration `20261125134153_reliable_event_delivery.sql` is aligned with the hosted migration history and is applied and verified. The older `20261125112000_reliable_event_delivery.sql` path is retained as a documented no-op to prevent duplicate DDL on fresh databases. The follow-up migration `20261125134241_index_workflow_run_attempts_fk.sql` adds the missing composite index for the attempt-history foreign key. The hosted project currently has zero workflow runs and zero alert rows, so the reliability migration's legacy `processing`-alert transition did not alter existing alert data.
 
 
 The original source for the pre-existing workspace foundation migration was unavailable. Its repository SQL is a reconstruction from the live catalog, not recovered original source. Do not use that reconstructed baseline to overwrite an existing database.
