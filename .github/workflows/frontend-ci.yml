@@ -64,3 +64,30 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run browser regression tests
         run: npm run test:e2e
+
+      - name: Package clean source bundle
+        working-directory: ..
+        run: |
+          set -euo pipefail
+          sensitive_files="$(git ls-tree -r --name-only "$GITHUB_SHA" \
+            | grep -E '(^|/)\.env($|\.)|(^|/)([^/]*\.(pem|key|p12|pfx)|id_rsa|id_ed25519)$' \
+            | grep -Ev '(^|/)\.env(\..*)?\.example$' || true)"
+          if [ -n "$sensitive_files" ]; then
+            echo "::error::Refusing to package tracked environment or private-key files:"
+            printf '%s\n' "$sensitive_files"
+            exit 1
+          fi
+
+          archive="$RUNNER_TEMP/DevOps-Insight-AI-source.zip"
+          git archive --format=zip --prefix=DevOps-Insight-AI/ "$GITHUB_SHA" -o "$archive"
+          test -s "$archive"
+          unzip -t "$archive"
+          echo "Source bundle created from commit $GITHUB_SHA"
+
+      - name: Upload verified source ZIP
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: ${{ runner.temp }}/DevOps-Insight-AI-source.zip
+          archive: false
+          if-no-files-found: error
+          retention-days: 7

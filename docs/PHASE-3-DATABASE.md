@@ -1,39 +1,47 @@
 # Phase 3 — Database security and platform data plane
 
-**Status: Migration and integration tests are in review. Not applied to the connected Supabase database.**
+**Status: Isolated PostgreSQL integration tests PASS on the Phase 3 branch. The migration has NOT been applied to the connected/production Supabase project.**
 
 ## Schema lineage
 
 The connected project reported one applied migration: `20261112100118_create_team_workspace_foundation`. Its SQL source was not present in the GitHub repository. The file with that exact applied version is reconstructed from read-only database catalog, table, policy, trigger, function, grant and index inspection as of 2026-11-24. It reproduces the verified schema needed for a fresh local database and preserves the existing version marker. It must be compared with the original migration source if it is later recovered.
 
-## Security changes in this phase
+## Security and data-plane changes
 
 - Move RLS `SECURITY DEFINER` helpers out of exposed `public` into `private`.
-- Remove public trigger/helper functions after repointing the owner-membership trigger.
-- Revoke broad `anon` and `authenticated` grants and regrant only the columns/actions used by the current frontend.
-- Reduce PostgreSQL default privileges for new objects created by the migration owner.
-- Make invitation mutations server-controlled; the browser can only list pending invitations for admins.
-- Preserve profile ownership and prevent browser-side changes to team owner IDs, project creator IDs, invitation membership, or notification verification.
+- Remove exposed helper functions after repointing the owner-membership trigger.
+- Revoke broad `anon` and `authenticated` grants and regrant only the columns/actions used by the browser.
+- Reduce PostgreSQL default privileges for newly created objects.
+- Make invitation/member mutations server-controlled.
+- Preserve profile ownership and prevent browser-side changes to team owner IDs, project creator IDs, membership, invitation state, or channel verification.
 - Remove the duplicate profiles-to-auth.users foreign key.
-- Add indexes for the three unindexed foreign keys.
-- Add team-scoped GitHub installation, repository, workflow, activity, webhook delivery, AI analysis, notification and audit tables.
-- Enable RLS for all new exposed tables. Webhook state, installation OAuth state and service-managed writes have no authenticated table grants.
+- Add indexes for previously unindexed foreign keys.
+- Add team-scoped GitHub installation, repository, workflow, activity, webhook delivery, AI analysis, notification, usage-quota and audit tables.
+- Enable RLS for every app table; private event state and server-managed writes have no authenticated table grants.
+- Protect the final team owner while preserving workspace deletion cascades.
 
-## Test strategy
+## Tests executed
 
-The database CI workflow runs PostgreSQL 17.11 with a minimal test-only `auth.users` table and `auth.uid()` shim. It applies the reconstructed baseline and the phase migration, then verifies:
-- Every app table has RLS enabled.
+The permanent **Database Security CI** workflow runs PostgreSQL 17.11 in an isolated GitHub Actions service container. It builds a test-only Supabase Auth shim, applies the reconstructed baseline, applies the incremental migration, and runs the security integration script.
+
+Verified assertions include:
+- RLS enabled on every application table.
 - `anon` cannot read or write application tables.
-- `authenticated` has only narrow table/column privileges.
+- Authenticated roles have narrow table/column grants only.
 - Team membership RLS prevents cross-team reads.
-- Invitation writes and webhook/private GitHub install state are server-only.
-- Private helpers are unavailable to `anon`; the old exposed helper functions are gone.
-- Team owner membership creation still works after moving the trigger function.
+- Auth profile-creation trigger matches the observed remote trigger behavior.
+- Webhook and GitHub installation state are not directly exposed.
+- Private helper functions are not executable by `anon`.
+- Future public tables/functions do not inherit broad defaults.
+- The duplicate profile foreign key is removed.
+- Atomic team AI quota cannot be claimed above the daily cap.
+- The last owner cannot be removed/demoted, but the owner can delete the workspace and related memberships cascade.
+- Owner membership is automatically created for new workspaces.
 
-This is a PostgreSQL integration test, not a live Supabase Edge Runtime or project migration test. Supabase-specific advisors and migration drift checks must be run against a confirmed development project before production apply.
+The latest verified Phase 3 commit has green **Database Security CI**, **Edge Functions CI**, and **Frontend CI**. These are isolated CI tests; they do not prove hosted project configuration, live provider credentials, real email delivery, GitHub App installation, or a production migration.
 
-## Important deployment blockers
+## Hosted deployment blockers
 
-The connected Supabase project is healthy and has the expected `teams` schema, but the frontend's environment template is still placeholder-only, so the repository's production Supabase project is not conclusively identified. Do not run `supabase db push --remote` until the project/domain mapping is confirmed, and do not merge the migration into a live database as part of automated CI.
+The connected Supabase project was healthy and had the expected workspace schema, but the app's frontend env template is placeholder-only. The repository's production Supabase project therefore remains unconfirmed. Do not run `supabase db push --remote` until the exact project reference and migration history are confirmed with the project operator.
 
-No storage buckets currently exist. The current database has no user data in teams/workspaces, but this migration preserves all existing data and does not drop application tables.
+No storage buckets currently exist. No live database data was changed by these tests or this branch.
