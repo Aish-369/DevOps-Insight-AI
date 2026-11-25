@@ -72,7 +72,8 @@ export function parseAnalysis(
   const normalizedLogs = normalizeEvidence(sourceLogs);
   const evidence = proposedEvidence.filter((item) => {
     const normalizedItem = normalizeEvidence(item);
-    return normalizedItem.length >= 8 && normalizedLogs.includes(normalizedItem);
+    return normalizedItem.length >= 8 &&
+      normalizedLogs.includes(normalizedItem);
   });
 
   if (evidence.length === 0) {
