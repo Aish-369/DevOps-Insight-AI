@@ -8,6 +8,7 @@ import {
   jsonResponse,
   preflight,
   readJsonObject,
+  readResponseBytes,
 } from "../_shared/http.ts";
 import { redactSecrets, sha256Hex } from "../_shared/security.ts";
 import { unzipSync } from "fflate";
@@ -73,8 +74,12 @@ async function fetchRunLogs(
     );
   }
 
-  const archive = new Uint8Array(await response.arrayBuffer());
-  if (archive.byteLength === 0 || archive.byteLength > MAX_LOG_ARCHIVE_BYTES) {
+  const archive = await readResponseBytes(
+    response,
+    MAX_LOG_ARCHIVE_BYTES,
+    "GITHUB_LOG_ARCHIVE_TOO_LARGE",
+  );
+  if (archive.byteLength === 0) {
     throw new HttpError(
       413,
       "GITHUB_LOG_ARCHIVE_TOO_LARGE",
