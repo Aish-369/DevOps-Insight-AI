@@ -5,6 +5,7 @@ import {
   handleError,
   HttpError,
   jsonResponse,
+  fetchWithTimeout,
   preflight,
   readJsonObject,
 } from "../_shared/http.ts";
@@ -33,7 +34,7 @@ async function fetchRunLogs(
   runId: number,
 ): Promise<string> {
   const token = await createInstallationToken(installationId);
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     "https://api.github.com/repos/" + repository + "/actions/runs/" + runId +
       "/logs",
     {
@@ -44,6 +45,7 @@ async function fetchRunLogs(
       },
       redirect: "follow",
     },
+    20_000,
   );
 
   if (!response.ok) {
@@ -292,7 +294,7 @@ Deno.serve(async (request: Request) => {
       "Untrusted workflow logs end.",
     ].join("\n");
 
-    const response = await fetch(endpoint.toString(), {
+    const response = await fetchWithTimeout(endpoint.toString(), {
       method: "POST",
       headers: {
         authorization: "Bearer " + apiKey,
@@ -306,7 +308,7 @@ Deno.serve(async (request: Request) => {
           { role: "user", content: userPrompt },
         ],
       }),
-    });
+    }, 45_000);
 
     if (!response.ok) {
       console.error("AI provider request failed", { status: response.status });
