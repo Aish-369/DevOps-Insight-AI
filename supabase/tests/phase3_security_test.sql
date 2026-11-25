@@ -292,4 +292,44 @@ BEGIN
 END
 $$;
 
+
+DO $post_migration_hardening$
+BEGIN
+  IF has_column_privilege('authenticated', 'public.team_invitations', 'token_hash', 'SELECT') THEN
+    RAISE EXCEPTION 'authenticated can read invitation token hashes';
+  END IF;
+  IF has_column_privilege('authenticated', 'public.alert_channels', 'verification_code_hash', 'SELECT')
+     OR has_column_privilege('authenticated', 'public.alert_channels', 'verification_expires_at', 'SELECT')
+     OR has_column_privilege('authenticated', 'public.alert_channels', 'verification_attempts', 'SELECT') THEN
+    RAISE EXCEPTION 'authenticated can read alert verification metadata';
+  END IF;
+  IF has_column_privilege('authenticated', 'public.alerts_sent', 'provider_message_id', 'SELECT') THEN
+    RAISE EXCEPTION 'authenticated can read provider delivery identifiers';
+  END IF;
+  IF NOT has_column_privilege('authenticated', 'public.team_invitations', 'email', 'SELECT')
+     OR NOT has_column_privilege('authenticated', 'public.alert_channels', 'target', 'SELECT') THEN
+    RAISE EXCEPTION 'frontend-safe workspace fields are not readable';
+  END IF;
+  IF to_regclass('public.activity_events_repo_team_idx') IS NULL
+     OR to_regclass('public.alert_channels_created_by_idx') IS NULL
+     OR to_regclass('public.alerts_sent_channel_team_idx') IS NULL
+     OR to_regclass('public.alerts_sent_run_team_idx') IS NULL
+     OR to_regclass('public.analysis_feedback_analysis_team_idx') IS NULL
+     OR to_regclass('public.analysis_feedback_user_idx') IS NULL
+     OR to_regclass('public.failure_analyses_job_team_idx') IS NULL
+     OR to_regclass('public.github_installation_states_team_idx') IS NULL
+     OR to_regclass('public.github_installation_states_user_idx') IS NULL
+     OR to_regclass('public.github_installations_created_by_idx') IS NULL
+     OR to_regclass('public.team_audit_events_actor_user_idx') IS NULL
+     OR to_regclass('public.team_audit_events_subject_user_idx') IS NULL THEN
+    RAISE EXCEPTION 'One or more Phase 3 foreign-key indexes are missing';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='webhook_events' AND policyname='webhook_events_deny_client')
+     OR NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='github_installation_states' AND policyname='github_installation_states_deny_client')
+     OR NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='team_ai_usage' AND policyname='team_ai_usage_deny_client') THEN
+    RAISE EXCEPTION 'Explicit client-deny policies are missing from internal tables';
+  END IF;
+END
+$post_migration_hardening$;
+
 ROLLBACK;
