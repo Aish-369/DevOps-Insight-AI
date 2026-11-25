@@ -257,7 +257,7 @@ BEGIN
 END
 $workspace_delete$;
 
-DO $
+DO $$
 DECLARE
   new_team_id uuid;
 BEGIN
