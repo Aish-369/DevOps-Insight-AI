@@ -103,6 +103,36 @@ export function handleError(request: Request, error: unknown): Response {
   );
 }
 
+const MAX_JSON_BODY_BYTES = 16_384;
+
+/**
+ * Fetch an upstream service with a bounded lifetime. The timeout signal remains
+ * attached to the response so a stalled response body is also aborted.
+ */
+export async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs = 15_000,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Response> {
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) {
+    throw new Error("The upstream timeout must be a positive integer.");
+  }
+  const signal = AbortSignal.timeout(timeoutMs);
+  try {
+    return await fetchImpl(input, { ...init, signal });
+  } catch (error) {
+    if (signal.aborted) {
+      throw new HttpError(
+        504,
+        "UPSTREAM_TIMEOUT",
+        "An external service did not respond in time.",
+      );
+    }
+    throw error;
+  }
+}
+
 export async function readJsonObject(
   request: Request,
 ): Promise<Record<string, unknown>> {
@@ -115,9 +145,30 @@ export async function readJsonObject(
     );
   }
 
-  const raw = await request.text();
-  if (raw.length > 16_384) {
-    throw new HttpError(413, "REQUEST_TOO_LARGE", "The request is too large.");
+  const reader = request.body?.getReader();
+  const decoder = new TextDecoder();
+  let raw = "";
+  let totalBytes = 0;
+  if (reader) {
+    try {
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        totalBytes += chunk.value.byteLength;
+        if (totalBytes > MAX_JSON_BODY_BYTES) {
+          await reader.cancel();
+          throw new HttpError(
+            413,
+            "REQUEST_TOO_LARGE",
+            "The request is too large.",
+          );
+        }
+        raw += decoder.decode(chunk.value, { stream: true });
+      }
+      raw += decoder.decode();
+    } finally {
+      reader.releaseLock();
+    }
   }
 
   let parsed: unknown;
