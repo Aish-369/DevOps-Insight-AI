@@ -34,6 +34,12 @@ Deno.test("AI analysis rejects invented evidence and downgrades confidence", () 
   );
   assertEquals(analysis.evidence, ["npm ERR! code ERESOLVE"]);
   assertEquals(analysis.confidence, "low");
+  assertEquals(analysis.category, "unknown");
+  assertEquals(analysis.fix_steps, []);
+  assertEquals(
+    analysis.cause,
+    "Some cited evidence could not be verified against the workflow logs; the root cause remains uncertain.",
+  );
 });
 
 Deno.test("AI analysis replaces the cause and fixes when no evidence is verifiable", () => {
@@ -53,6 +59,7 @@ Deno.test("AI analysis replaces the cause and fixes when no evidence is verifiab
   assertEquals(analysis.fix_steps, []);
   assertEquals(analysis.evidence, []);
   assertEquals(analysis.confidence, "low");
+  assertEquals(analysis.category, "unknown");
 });
 
 Deno.test("AI analysis normalizes whitespace when verifying evidence", () => {
