@@ -51,7 +51,8 @@ async function dispatchTeamAlerts(
   admin: SupabaseClient,
   teamId: string,
 ): Promise<DispatchSummary> {
-  const staleSendingBefore = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
+  const staleSendingBefore = new Date(Date.now() - STALE_CLAIM_MS)
+    .toISOString();
   const { error: staleSendingError } = await admin
     .from("alerts_sent")
     .update({
@@ -172,7 +173,9 @@ async function dispatchTeamAlerts(
       ) {
         throw new Error("Alert provider is not configured.");
       }
-      if (channel.channel_type !== "email" && channel.channel_type !== "telegram") {
+      if (
+        channel.channel_type !== "email" && channel.channel_type !== "telegram"
+      ) {
         throw new Error("Unsupported alert channel.");
       }
 
