@@ -105,6 +105,55 @@ export function handleError(request: Request, error: unknown): Response {
 
 const MAX_JSON_BODY_BYTES = 16_384;
 
+/** Read raw request bytes without buffering an unbounded incoming body. */
+export async function readRequestBytes(
+  request: Request,
+  maxBytes: number,
+): Promise<Uint8Array> {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) {
+    throw new Error("The request byte limit must be a positive integer.");
+  }
+  const declaredLength = Number(request.headers.get("content-length") ?? "");
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    throw new HttpError(
+      413,
+      "PAYLOAD_TOO_LARGE",
+      "The request payload is too large.",
+    );
+  }
+
+  const reader = request.body?.getReader();
+  if (!reader) return new Uint8Array();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      totalBytes += chunk.value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel();
+        throw new HttpError(
+          413,
+          "PAYLOAD_TOO_LARGE",
+          "The request payload is too large.",
+        );
+      }
+      chunks.push(chunk.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const result = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return result;
+}
+
 /**
  * Fetch an upstream service with a bounded lifetime. The timeout signal remains
  * attached to the response so a stalled response body is also aborted.
