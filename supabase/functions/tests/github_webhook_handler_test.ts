@@ -141,3 +141,219 @@ Deno.test("webhook handler acknowledges unsupported events without database acce
   assertEquals(response.status, 200);
   assertEquals(await responseBody(response), { ok: true, ignored: true });
 });
+
+
+type MockFilter = { column: string; value: unknown };
+
+interface RepositoryMockConfig {
+  installationId: number;
+  repositoryId: number;
+  repositoryInstallationId: number;
+  teamId: string;
+  active: boolean;
+}
+
+class MockSupabaseQuery implements PromiseLike<{ data: unknown; error: null }> {
+  private readonly filters: MockFilter[] = [];
+
+  constructor(
+    private readonly table: string,
+    private readonly config: RepositoryMockConfig,
+    private readonly writes: { pendingJobs: unknown[] },
+  ) {}
+
+  select(_columns: string): this {
+    return this;
+  }
+
+  eq(column: string, value: unknown): this {
+    this.filters.push({ column, value });
+    return this;
+  }
+
+  is(column: string, value: unknown): this {
+    this.filters.push({ column, value });
+    return this;
+  }
+
+  update(_values: unknown): this {
+    return this;
+  }
+
+  delete(): this {
+    return this;
+  }
+
+  insert(_values: unknown): Promise<{ error: null }> {
+    return Promise.resolve({ error: null });
+  }
+
+  upsert(values: unknown): Promise<{ error: null }> {
+    if (this.table === "pending_workflow_jobs") {
+      this.writes.pendingJobs.push(values);
+    }
+    return Promise.resolve({ error: null });
+  }
+
+  async maybeSingle(): Promise<{ data: unknown; error: null }> {
+    const matches = (expected: MockFilter[]) =>
+      expected.every((filter) =>
+        this.filters.some((actual) =>
+          actual.column === filter.column && actual.value === filter.value
+        )
+      );
+
+    if (
+      this.table === "github_installations" &&
+      matches([
+        { column: "installation_id", value: this.config.installationId },
+        { column: "deleted_at", value: null },
+      ])
+    ) {
+      return {
+        data: {
+          installation_id: this.config.installationId,
+          team_id: this.config.teamId,
+        },
+        error: null,
+      };
+    }
+
+    if (
+      this.table === "team_repositories" &&
+      matches([
+        { column: "team_id", value: this.config.teamId },
+        { column: "github_repo_id", value: this.config.repositoryId },
+        { column: "active", value: true },
+        {
+          column: "installation_id",
+          value: this.config.repositoryInstallationId,
+        },
+      ]) &&
+      this.config.active &&
+      this.config.repositoryInstallationId === this.config.installationId
+    ) {
+      return {
+        data: {
+          github_repo_id: this.config.repositoryId,
+          installation_id: this.config.repositoryInstallationId,
+          full_name: "acme/service",
+        },
+        error: null,
+      };
+    }
+
+    return { data: null, error: null };
+  }
+
+  then<TResult1 = { data: unknown; error: null }, TResult2 = never>(
+    onfulfilled?: (
+      value: { data: unknown; error: null },
+    ) => TResult1 | PromiseLike<TResult1>,
+    onrejected?: (reason: unknown) => TResult2 | PromiseLike<TResult2>,
+  ): PromiseLike<TResult1 | TResult2> {
+    return Promise.resolve({ data: null, error: null }).then(
+      onfulfilled,
+      onrejected,
+    );
+  }
+}
+
+function mockAdmin(config: RepositoryMockConfig): {
+  client: ReturnType<WebhookHandlerDependencies["createAdminClient"]>;
+  writes: { pendingJobs: unknown[] };
+} {
+  const writes = { pendingJobs: [] as unknown[] };
+  const client = {
+    from(table: string) {
+      return new MockSupabaseQuery(table, config, writes);
+    },
+  };
+  return {
+    client: client as unknown as ReturnType<
+      WebhookHandlerDependencies["createAdminClient"]
+    >,
+    writes,
+  };
+}
+
+function workflowJobPayload(
+  installationId: number,
+  repositoryId: number,
+): string {
+  return JSON.stringify({
+    installation: { id: installationId },
+    repository: { id: repositoryId },
+    workflow_job: {
+      id: 789,
+      run_id: 987,
+      name: "test job",
+      status: "completed",
+      conclusion: "success",
+      steps: [],
+    },
+  });
+}
+
+Deno.test("workflow_job webhook is processed for its active repository installation", async () => {
+  const mock = mockAdmin({
+    installationId: 456,
+    repositoryId: 123,
+    repositoryInstallationId: 456,
+    teamId: "team-a",
+    active: true,
+  });
+  const req = await request(
+    workflowJobPayload(456, 123),
+    "workflow_job",
+    "delivery-valid-repository",
+  );
+  const response = await handleGithubWebhook(
+    req,
+    dependencies({ createAdminClient: () => mock.client }),
+  );
+  assertEquals(response.status, 200);
+  assertEquals(mock.writes.pendingJobs.length, 1);
+});
+
+Deno.test("workflow_job webhook rejects an inactive repository mapping", async () => {
+  const mock = mockAdmin({
+    installationId: 456,
+    repositoryId: 123,
+    repositoryInstallationId: 456,
+    teamId: "team-a",
+    active: false,
+  });
+  const req = await request(
+    workflowJobPayload(456, 123),
+    "workflow_job",
+    "delivery-inactive-repository",
+  );
+  const response = await handleGithubWebhook(
+    req,
+    dependencies({ createAdminClient: () => mock.client }),
+  );
+  assertEquals(response.status, 500);
+  assertEquals(mock.writes.pendingJobs.length, 0);
+});
+
+Deno.test("workflow_job webhook rejects a repository mapped to another installation", async () => {
+  const mock = mockAdmin({
+    installationId: 456,
+    repositoryId: 123,
+    repositoryInstallationId: 999,
+    teamId: "team-a",
+    active: true,
+  });
+  const req = await request(
+    workflowJobPayload(456, 123),
+    "workflow_job",
+    "delivery-wrong-installation",
+  );
+  const response = await handleGithubWebhook(
+    req,
+    dependencies({ createAdminClient: () => mock.client }),
+  );
+  assertEquals(response.status, 500);
+  assertEquals(mock.writes.pendingJobs.length, 0);
+});
