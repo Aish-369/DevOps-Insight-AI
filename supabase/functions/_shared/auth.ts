@@ -124,7 +124,7 @@ export async function requireTeamRole(
 export async function writeAudit(
   admin: SupabaseClient,
   teamId: string,
-  actorUserId: string,
+  actorUserId: string | null,
   eventType: string,
   details: Record<string, unknown> = {},
 ): Promise<void> {

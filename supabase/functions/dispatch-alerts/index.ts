@@ -1,4 +1,10 @@
-import { requireAuth, requireTeamRole, writeAudit } from "../_shared/auth.ts";
+import {
+  createAdminClient,
+  requireAuth,
+  requireTeamRole,
+  writeAudit,
+} from "../_shared/auth.ts";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendEmail } from "../_shared/email.ts";
 import { sendTelegramMessage } from "../_shared/telegram.ts";
 import {
@@ -9,6 +15,181 @@ import {
   preflight,
   readJsonObject,
 } from "../_shared/http.ts";
+import { constantTimeEqual } from "../_shared/security.ts";
+
+const MAX_ATTEMPTS = 5;
+const STALE_CLAIM_MS = 5 * 60 * 1000;
+
+function isValidTeamId(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    .test(value);
+}
+
+function dueAlertFilter(now = Date.now()): string {
+  const staleBefore = new Date(now - STALE_CLAIM_MS).toISOString();
+  return [
+    "status.eq.pending",
+    "and(status.eq.failed,attempt_count.lt." + MAX_ATTEMPTS + ")",
+    "and(status.eq.processing,claimed_at.lt." + staleBefore + ",attempt_count.lt." + MAX_ATTEMPTS + ")",
+  ].join(",");
+}
+
+function hasSchedulerAuthorization(request: Request): boolean {
+  const expected = Deno.env.get("ALERT_SCHEDULER_SECRET")?.trim() ?? "";
+  const provided = request.headers.get("x-scheduler-secret") ?? "";
+  return expected.length >= 32 && constantTimeEqual(expected, provided);
+}
+
+type DispatchSummary = {
+  processed: number;
+  sent: number;
+  failed: number;
+};
+
+async function dispatchTeamAlerts(
+  admin: SupabaseClient,
+  teamId: string,
+): Promise<DispatchSummary> {
+  const { data: pending, error } = await admin
+    .from("alerts_sent")
+    .select(
+      "id,team_id,channel_id,github_run_id,kind,dedupe_key,status,attempt_count",
+    )
+    .eq("team_id", teamId)
+    .or(dueAlertFilter())
+    .order("created_at", { ascending: true })
+    .limit(25);
+
+  if (error) {
+    throw new HttpError(
+      500,
+      "ALERT_QUEUE_LOOKUP_FAILED",
+      "Pending alerts could not be loaded.",
+    );
+  }
+
+  let sent = 0;
+  let failed = 0;
+  for (const alert of pending ?? []) {
+    const attemptedAt = new Date().toISOString();
+    const nextAttempt = Number(alert.attempt_count ?? 0) + 1;
+    const { data: claim, error: claimError } = await admin
+      .from("alerts_sent")
+      .update({
+        status: "processing",
+        attempt_count: nextAttempt,
+        claimed_at: attemptedAt,
+        attempted_at: attemptedAt,
+      })
+      .eq("id", alert.id)
+      .eq("team_id", teamId)
+      .eq("status", alert.status)
+      .eq("attempt_count", alert.attempt_count ?? 0)
+      .select("id")
+      .maybeSingle();
+
+    if (claimError) {
+      failed += 1;
+      continue;
+    }
+    if (!claim) continue;
+
+    try {
+      const [
+        { data: channel, error: channelError },
+        { data: run, error: runError },
+      ] = await Promise.all([
+        admin.from("alert_channels")
+          .select("id,channel_type,target,verified_at")
+          .eq("id", alert.channel_id)
+          .eq("team_id", teamId)
+          .maybeSingle(),
+        admin.from("workflow_runs")
+          .select(
+            "github_run_id,github_repo_id,head_branch,conclusion,html_url",
+          )
+          .eq("github_run_id", alert.github_run_id)
+          .eq("team_id", teamId)
+          .maybeSingle(),
+      ]);
+
+      if (
+        channelError || runError || !channel || !run || !channel.verified_at
+      ) {
+        throw new Error(
+          "Alert channel or workflow run is no longer available.",
+        );
+      }
+
+      const { data: repository, error: repositoryError } = await admin
+        .from("team_repositories")
+        .select("full_name")
+        .eq("github_repo_id", run.github_repo_id)
+        .eq("team_id", teamId)
+        .maybeSingle();
+      if (repositoryError || !repository) {
+        throw new Error("Repository details are unavailable.");
+      }
+
+      const summary = [
+        "DevOps Insight AI alert",
+        "Repository: " + repository.full_name,
+        "Workflow run: " + run.github_run_id,
+        "Branch: " + String(run.head_branch ?? "unknown"),
+        "Result: " + String(run.conclusion ?? "unknown"),
+        "Event: " + alert.kind,
+        run.html_url ? "Open run: " + run.html_url : "",
+      ].filter(Boolean).join("\n");
+
+      let providerMessageId = "accepted";
+      if (channel.channel_type === "email") {
+        providerMessageId = await sendEmail(
+          channel.target,
+          "DevOps Insight AI: " + alert.kind + " workflow alert",
+          '<pre style="white-space:pre-wrap;font-family:Arial,sans-serif">' +
+            escapeHtml(summary) +
+            "</pre>",
+        );
+      } else if (channel.channel_type === "telegram") {
+        providerMessageId = await sendTelegramMessage(channel.target, summary);
+      } else {
+        throw new Error("Unsupported alert channel.");
+      }
+
+      const { error: updateError } = await admin.from("alerts_sent")
+        .update({
+          status: "sent",
+          attempted_at: attemptedAt,
+          sent_at: new Date().toISOString(),
+          provider_message_id: providerMessageId,
+          failure_code: null,
+        })
+        .eq("id", alert.id)
+        .eq("team_id", teamId)
+        .eq("status", "processing")
+        .eq("attempt_count", nextAttempt);
+
+      if (updateError) {
+        throw new Error("Alert delivery status could not be saved.");
+      }
+      sent += 1;
+    } catch {
+      await admin.from("alerts_sent").update({
+        status: "failed",
+        attempted_at: attemptedAt,
+        failure_code: nextAttempt >= MAX_ATTEMPTS
+          ? "MAX_ATTEMPTS_REACHED"
+          : "PROVIDER_DELIVERY_FAILED",
+      }).eq("id", alert.id)
+        .eq("team_id", teamId)
+        .eq("status", "processing")
+        .eq("attempt_count", nextAttempt);
+      failed += 1;
+    }
+  }
+
+  return { processed: (pending ?? []).length, sent, failed };
+}
 
 Deno.serve(async (request: Request) => {
   const options = preflight(request);
@@ -17,189 +198,65 @@ Deno.serve(async (request: Request) => {
   try {
     assertAllowedOrigin(request);
     if (request.method !== "POST") {
-      throw new HttpError(
-        405,
-        "METHOD_NOT_ALLOWED",
-        "Use POST for this operation.",
-      );
+      throw new HttpError(405, "METHOD_NOT_ALLOWED", "Use POST for this operation.");
+    }
+
+    const body = await readJsonObject(request);
+
+    if (hasSchedulerAuthorization(request)) {
+      if (body.mode !== "all") {
+        throw new HttpError(400, "INVALID_SCHEDULER_MODE", "The scheduler must request mode=all.");
+      }
+
+      const admin = createAdminClient();
+      const { data: dueRows, error } = await admin
+        .from("alerts_sent")
+        .select("team_id")
+        .or(dueAlertFilter())
+        .limit(5000);
+      if (error) {
+        throw new HttpError(500, "ALERT_SCHEDULER_LOOKUP_FAILED", "Due alert workspaces could not be listed.");
+      }
+
+      const teamIds = [...new Set((dueRows ?? []).map((row) => String(row.team_id)))];
+      const total: DispatchSummary = { processed: 0, sent: 0, failed: 0 };
+      const teamErrors: string[] = [];
+      for (const teamId of teamIds) {
+        try {
+          const result = await dispatchTeamAlerts(admin, teamId);
+          total.processed += result.processed;
+          total.sent += result.sent;
+          total.failed += result.failed;
+        } catch {
+          teamErrors.push(teamId);
+        }
+      }
+
+      return jsonResponse(request, {
+        ok: true,
+        mode: "scheduled",
+        workspace_count: teamIds.length,
+        ...total,
+        workspace_errors: teamErrors.length,
+      });
     }
 
     const context = await requireAuth(request);
-    const body = await readJsonObject(request);
     const teamId = typeof body.team_id === "string" ? body.team_id : "";
-    if (
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-        .test(teamId)
-    ) {
-      throw new HttpError(
-        400,
-        "INVALID_TEAM_ID",
-        "A valid team ID is required.",
-      );
+    if (!isValidTeamId(teamId)) {
+      throw new HttpError(400, "INVALID_TEAM_ID", "A valid team ID is required.");
     }
     await requireTeamRole(context, teamId);
-
-    const { data: pending, error } = await context.admin
-      .from("alerts_sent")
-      .select(
-        "id,team_id,channel_id,github_run_id,kind,dedupe_key,status,attempt_count",
-      )
-      .eq("team_id", teamId)
-      .or(
-        "status.eq.pending,and(status.eq.processing,claimed_at.lt." +
-          new Date(Date.now() - 5 * 60 * 1000).toISOString() + ")",
-      )
-      .order("created_at", { ascending: true })
-      .limit(25);
-
-    if (error) {
-      throw new HttpError(
-        500,
-        "ALERT_QUEUE_LOOKUP_FAILED",
-        "Pending alerts could not be loaded.",
-      );
-    }
-
-    let sent = 0;
-    let failed = 0;
-    for (const alert of pending ?? []) {
-      const attemptedAt = new Date().toISOString();
-      const nextAttempt = Number(alert.attempt_count ?? 0) + 1;
-      const { data: claim, error: claimError } = await context.admin
-        .from("alerts_sent")
-        .update({
-          status: "processing",
-          attempt_count: nextAttempt,
-          claimed_at: attemptedAt,
-          attempted_at: attemptedAt,
-        })
-        .eq("id", alert.id)
-        .eq("team_id", teamId)
-        .eq("status", alert.status)
-        .eq("attempt_count", alert.attempt_count ?? 0)
-        .select("id")
-        .maybeSingle();
-
-      if (claimError) {
-        failed += 1;
-        continue;
-      }
-      if (!claim) continue;
-
-      try {
-        const [
-          { data: channel, error: channelError },
-          { data: run, error: runError },
-        ] = await Promise.all([
-          context.admin.from("alert_channels")
-            .select("id,channel_type,target,verified_at")
-            .eq("id", alert.channel_id)
-            .eq("team_id", teamId)
-            .maybeSingle(),
-          context.admin.from("workflow_runs")
-            .select(
-              "github_run_id,github_repo_id,head_branch,conclusion,html_url",
-            )
-            .eq("github_run_id", alert.github_run_id)
-            .eq("team_id", teamId)
-            .maybeSingle(),
-        ]);
-
-        if (
-          channelError || runError || !channel || !run || !channel.verified_at
-        ) {
-          throw new Error(
-            "Alert channel or workflow run is no longer available.",
-          );
-        }
-
-        const { data: repository, error: repositoryError } = await context.admin
-          .from("team_repositories")
-          .select("full_name")
-          .eq("github_repo_id", run.github_repo_id)
-          .eq("team_id", teamId)
-          .maybeSingle();
-        if (repositoryError || !repository) {
-          throw new Error("Repository details are unavailable.");
-        }
-
-        const summary = [
-          "DevOps Insight AI alert",
-          "Repository: " + repository.full_name,
-          "Workflow run: " + run.github_run_id,
-          "Branch: " + String(run.head_branch ?? "unknown"),
-          "Result: " + String(run.conclusion ?? "unknown"),
-          "Event: " + alert.kind,
-          run.html_url ? "Open run: " + run.html_url : "",
-        ].filter(Boolean).join("\n");
-
-        let providerMessageId = "accepted";
-        if (channel.channel_type === "email") {
-          const emailResult = await sendEmail(
-            channel.target,
-            "DevOps Insight AI: " + alert.kind + " workflow alert",
-            '<pre style="white-space:pre-wrap;font-family:Arial,sans-serif">' +
-              escapeHtml(summary) +
-              "</pre>",
-          );
-          providerMessageId = emailResult;
-        } else if (channel.channel_type === "telegram") {
-          providerMessageId = await sendTelegramMessage(
-            channel.target,
-            summary,
-          );
-        } else {
-          throw new Error("Unsupported alert channel.");
-        }
-
-        const { error: updateError } = await context.admin.from("alerts_sent")
-          .update({
-            status: "sent",
-            attempted_at: attemptedAt,
-            sent_at: new Date().toISOString(),
-            provider_message_id: providerMessageId,
-            failure_code: null,
-          })
-          .eq("id", alert.id)
-          .eq("team_id", teamId)
-          .eq("status", "processing")
-          .eq("attempt_count", nextAttempt);
-
-        if (updateError) {
-          throw new Error("Alert delivery status could not be saved.");
-        }
-        sent += 1;
-      } catch {
-        await context.admin.from("alerts_sent").update({
-          status: "failed",
-          attempted_at: attemptedAt,
-          failure_code: "PROVIDER_DELIVERY_FAILED",
-        }).eq("id", alert.id)
-          .eq("team_id", teamId)
-          .eq("status", "processing")
-          .eq("attempt_count", nextAttempt);
-        failed += 1;
-      }
-    }
-
+    const result = await dispatchTeamAlerts(context.admin, teamId);
     await writeAudit(
       context.admin,
       teamId,
       context.user.id,
       "alerts.dispatch_requested",
-      {
-        processed_count: (pending ?? []).length,
-        sent_count: sent,
-        failed_count: failed,
-      },
+      result,
     );
 
-    return jsonResponse(request, {
-      ok: true,
-      processed: (pending ?? []).length,
-      sent,
-      failed,
-    });
+    return jsonResponse(request, { ok: true, ...result });
   } catch (error) {
     return handleError(request, error);
   }
