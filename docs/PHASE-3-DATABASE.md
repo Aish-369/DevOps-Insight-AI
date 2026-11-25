@@ -1,47 +1,49 @@
-# Phase 3 — Database security and platform data plane
+# Phase 3 — Database security and live verification
 
-**Status: Isolated PostgreSQL integration tests PASS on the Phase 3 branch. The migration has NOT been applied to the connected/production Supabase project.**
+**Target:** Supabase project `mtrmvvtobbbjusiteyvp` (confirmed by the project owner)  
+**Last verified:** 2026-11-25  
+**Status:** Database migrations applied successfully. Edge Functions are not yet deployed.
 
-## Schema lineage
+## Applied migration history
 
-The connected project reported one applied migration: `20261112100118_create_team_workspace_foundation`. Its SQL source was not present in the GitHub repository. The file with that exact applied version is reconstructed from read-only database catalog, table, policy, trigger, function, grant and index inspection as of 2026-11-24. It reproduces the verified schema needed for a fresh local database and preserves the existing version marker. It must be compared with the original migration source if it is later recovered.
+The hosted project reports these exact migration versions:
 
-## Security and data-plane changes
+1. `20261112100118_create_team_workspace_foundation` — pre-existing workspace foundation.
+2. `20261125111227_secure_workspace_data_plane` — RLS, private helper functions, least-privilege grants, server-managed data plane and workspace ownership guard.
+3. `20261125111400_index_phase3_foreign_keys` — indexes covering the 12 foreign keys identified by the performance advisor.
+4. `20261125111523_restrict_sensitive_workspace_columns` — hides invitation token hashes, alert verification metadata and provider message IDs from authenticated browser clients.
+5. `20261125111715_deny_client_access_to_internal_tables` — explicit deny policies for internal webhook, installation-state and AI-usage tables.
 
-- Move RLS `SECURITY DEFINER` helpers out of exposed `public` into `private`.
-- Remove exposed helper functions after repointing the owner-membership trigger.
-- Revoke broad `anon` and `authenticated` grants and regrant only the columns/actions used by the browser.
-- Reduce PostgreSQL default privileges for newly created objects.
-- Make invitation/member mutations server-controlled.
-- Preserve profile ownership and prevent browser-side changes to team owner IDs, project creator IDs, membership, invitation state, or channel verification.
-- Remove the duplicate profiles-to-auth.users foreign key.
-- Add indexes for previously unindexed foreign keys.
-- Add team-scoped GitHub installation, repository, workflow, activity, webhook delivery, AI analysis, notification, usage-quota and audit tables.
-- Enable RLS for every app table; private event state and server-managed writes have no authenticated table grants.
-- Protect the final team owner while preserving workspace deletion cascades.
+The repository migration filenames are aligned with the hosted migration versions. Do not reapply these migrations manually.
 
-## Tests executed
+## Baseline caveat
 
-The permanent **Database Security CI** workflow runs PostgreSQL 17.11 in an isolated GitHub Actions service container. It builds a test-only Supabase Auth shim, applies the reconstructed baseline, applies the incremental migration, and runs the security integration script.
+The original source for the already-applied workspace foundation migration was not available in the repository. The file `20261112100118_create_team_workspace_foundation.sql` is a documented reconstruction from read-only catalog inspection. It was not reapplied to the hosted project. Compare it with the original source if it is recovered before using it to provision a different database.
 
-Verified assertions include:
-- RLS enabled on every application table.
-- `anon` cannot read or write application tables.
-- Authenticated roles have narrow table/column grants only.
-- Team membership RLS prevents cross-team reads.
-- Auth profile-creation trigger matches the observed remote trigger behavior.
-- Webhook and GitHub installation state are not directly exposed.
-- Private helper functions are not executable by `anon`.
-- Future public tables/functions do not inherit broad defaults.
-- The duplicate profile foreign key is removed.
-- Atomic team AI quota cannot be claimed above the daily cap.
-- The last owner cannot be removed/demoted, but the owner can delete the workspace and related memberships cascade.
-- Owner membership is automatically created for new workspaces.
+## Live checks performed
 
-The latest verified Phase 3 commit has green **Database Security CI**, **Edge Functions CI**, and **Frontend CI**. These are isolated CI tests; they do not prove hosted project configuration, live provider credentials, real email delivery, GitHub App installation, or a production migration.
+- The incremental security migration passed a transaction/rollback validation before application.
+- Supabase reported success for all four incremental migrations.
+- All 19 public application tables have RLS enabled.
+- Internal tables `webhook_events`, `github_installation_states` and `team_ai_usage` have explicit client-deny policies and no client table grants.
+- Team membership/admin helpers live in the non-exposed `private` schema. Anonymous execution is denied; authenticated users can execute only the two helpers needed by RLS.
+- The AI quota claim function is executable only by `service_role`.
+- Authenticated users cannot read `team_invitations.token_hash`, `alert_channels.verification_code_hash`, verification expiry/attempt metadata or `alerts_sent.provider_message_id`. Required UI columns remain readable.
+- The duplicate `profiles(id) → auth.users(id)` foreign key was removed; the equivalent FK remains.
+- All four pre-existing workspace table row counts checked before and after migration remained zero. No existing workspace rows were deleted or rewritten.
+- The performance advisor no longer reports unindexed foreign keys.
+- No Edge Functions are currently deployed to the target project.
 
-## Hosted deployment blockers
+## Remaining advisor findings
 
-The connected Supabase project was healthy and had the expected workspace schema, but the app's frontend env template is placeholder-only. The repository's production Supabase project therefore remains unconfirmed. Do not run `supabase db push --remote` until the exact project reference and migration history are confirmed with the project operator.
+- **Leaked password protection disabled (WARN):** Supabase documents this HaveIBeenPwned-based control as available on Pro and above. It cannot be enabled on the Free plan. Keep a strong minimum password length and character requirements in Auth settings; the advisor warning will remain while on Free.
+- **Unused indexes (INFO):** 32 indexes are currently reported unused. The new tables have not received production workload yet, so these are not grounds for dropping indexes. Reassess after real query traffic.
+- The three former “RLS enabled, no policy” informational findings are cleared by explicit client-deny policies.
 
-No storage buckets currently exist. No live database data was changed by these tests or this branch.
+## CI status
+
+Database Security CI now applies the baseline plus all four incremental migrations before running the SQL integration test. See the latest GitHub Actions run for the final result; do not treat an in-progress run as passed.
+
+## Production readiness boundary
+
+The database hardening is applied, but this does not mean the whole product is production-ready. External provider secrets, the browser origin, Edge Function deployment, Auth redirect settings and end-to-end provider tests remain outstanding.
