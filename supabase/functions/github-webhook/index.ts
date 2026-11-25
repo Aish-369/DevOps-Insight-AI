@@ -698,7 +698,7 @@ Deno.serve(async (request: Request) => {
       })
       .eq("delivery_id", deliveryId)
       .eq("status", existingDelivery.status)
-      .eq("attempts", currentAttempts)
+      .eq("attempts", disposition.attempts - 1)
       .select("delivery_id")
       .maybeSingle();
     if (retryError || !retryClaim) {
