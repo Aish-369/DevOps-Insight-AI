@@ -11,6 +11,7 @@ import {
 } from "../_shared/http.ts";
 import { redactSecrets, sha256Hex } from "../_shared/security.ts";
 import { unzipSync } from "fflate";
+import { getActiveRepositoryMapping } from "../_shared/repository-access.ts";
 
 const MAX_LOG_ARCHIVE_BYTES = 20 * 1024 * 1024;
 const MAX_LOG_TEXT_CHARS = 120_000;
@@ -197,15 +198,13 @@ Deno.serve(async (request: Request) => {
     }
 
     let installationId = 0;
-    const { data: repository, error: repoError } = await context.admin
-      .from("team_repositories")
-      .select("github_repo_id,full_name,installation_id")
-      .eq("team_id", teamId)
-      .eq("github_repo_id", run.github_repo_id)
-      .eq("active", true)
-      .maybeSingle();
+    const repository = await getActiveRepositoryMapping(
+      context.admin,
+      teamId,
+      Number(run.github_repo_id),
+    );
 
-    if (repoError || !repository) {
+    if (!repository) {
       throw new HttpError(
         404,
         "REPOSITORY_NOT_FOUND",
