@@ -1,7 +1,7 @@
 # Phase 3 — Operations and deployment guide
 
 **Confirmed Supabase target:** `mtrmvvtobbbjusiteyvp`  
-**Current state (2026-11-25):** The five migrations listed below are applied. The new reliability migration in the current Git branch is not yet applied. No Edge Functions have been deployed yet. No paid Supabase development branch was created.
+**Current state (2026-11-25):** Seven migrations listed below are applied. The reliability and workflow-attempt index migrations are now applied and verified. No Edge Functions have been deployed yet. No paid Supabase development branch was created.
 
 ## 1. Database state — already applied
 
@@ -12,10 +12,12 @@ The target project's migration history is:
 - `20261125111400_index_phase3_foreign_keys`
 - `20261125111523_restrict_sensitive_workspace_columns`
 - `20261125111715_deny_client_access_to_internal_tables`
+- `20261125134153_reliable_event_delivery`
+- `20261125134241_index_workflow_run_attempts_fk`
 
 Do not re-run these migrations. The four incremental migrations were applied after a successful transaction/rollback validation. Workspace row counts for teams, members, invitations and projects were zero before and after. No database backup was created during this session; the migration set was additive/security-focused, and the existing workspace tables contained no rows at the time of application.
 
-The branch also contains `20261125112000_reliable_event_delivery.sql`. It adds shared API rate-limit buckets, workflow attempt history, normalized pending-job reconciliation, and explicit ambiguous alert-delivery states. It has **not** been applied to the hosted project. Apply it only as part of the separately approved deployment/migration step, after its Database Security CI run passes. Do not claim these new tables or states exist in the hosted database until that migration is applied and verified.
+The migration `20261125112000_reliable_event_delivery.sql` is applied and verified. The follow-up migration `20261125134241_index_workflow_run_attempts_fk.sql` adds the missing composite index for the attempt-history foreign key. The hosted project currently has zero workflow runs and zero alert rows, so the reliability migration's legacy `processing`-alert transition did not alter existing alert data.
 
 
 The original source for the pre-existing workspace foundation migration was unavailable. Its repository SQL is a reconstruction from the live catalog, not recovered original source. Do not use that reconstructed baseline to overwrite an existing database.
