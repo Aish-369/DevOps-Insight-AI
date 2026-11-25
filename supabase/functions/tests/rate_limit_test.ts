@@ -1,4 +1,4 @@
-import { assertEquals, assertNotEquals, assertMatch } from "@std/assert";
+import { assertEquals, assertMatch, assertNotEquals } from "@std/assert";
 import { rateLimitKeyHash } from "../_shared/rate-limit.ts";
 
 Deno.test("rate-limit keys are stable SHA-256 hashes", async () => {
@@ -17,7 +17,10 @@ Deno.test("rate-limit keys are stable SHA-256 hashes", async () => {
 Deno.test("rate-limit keys are isolated by user and endpoint", async () => {
   const base = await rateLimitKeyHash("user-a", "dispatch-alerts");
   const otherUser = await rateLimitKeyHash("user-b", "dispatch-alerts");
-  const otherEndpoint = await rateLimitKeyHash("user-a", "verify-alert-channel");
+  const otherEndpoint = await rateLimitKeyHash(
+    "user-a",
+    "verify-alert-channel",
+  );
   assertNotEquals(base, otherUser);
   assertNotEquals(base, otherEndpoint);
 });
