@@ -173,7 +173,7 @@ async function reconcilePendingWorkflowJobs(
     .eq("github_run_id", runId)
     .gt("expires_at", now)
     .order("created_at", { ascending: true })
-    .limit(100);
+    .limit(1000);
 
   if (error) {
     throw new HttpError(
@@ -402,6 +402,18 @@ async function processWorkflowJob(
   }
   if (parentRun) {
     await saveWorkflowJob(admin, teamId, runId, job);
+    const { error: pendingDeleteError } = await admin
+      .from("pending_workflow_jobs")
+      .delete()
+      .eq("github_job_id", jobId)
+      .eq("team_id", teamId);
+    if (pendingDeleteError) {
+      throw new HttpError(
+        500,
+        "PENDING_WORKFLOW_JOB_DELETE_FAILED",
+        "A previously queued workflow job could not be finalized.",
+      );
+    }
     return;
   }
 
