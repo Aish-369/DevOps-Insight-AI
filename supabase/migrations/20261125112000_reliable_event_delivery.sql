@@ -18,6 +18,17 @@ CREATE TABLE public.workflow_run_attempts (
 CREATE INDEX workflow_run_attempts_team_run_idx
   ON public.workflow_run_attempts(team_id, github_run_id, run_attempt DESC);
 
+-- Seed the latest known attempt for runs that existed before this migration.
+INSERT INTO public.workflow_run_attempts (
+  github_run_id, team_id, run_attempt, status, conclusion,
+  completed_at, github_updated_at
+)
+SELECT
+  github_run_id, team_id, run_attempt, status, conclusion,
+  completed_at, github_updated_at
+FROM public.workflow_runs
+ON CONFLICT (github_run_id, run_attempt) DO NOTHING;
+
 CREATE OR REPLACE FUNCTION private.keep_latest_workflow_run_snapshot()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -32,7 +43,7 @@ BEGIN
        NEW.run_attempt = OLD.run_attempt
        AND NEW.github_updated_at IS NOT NULL
        AND OLD.github_updated_at IS NOT NULL
-       AND NEW.github_updated_at < OLD.github_updated_at
+       AND (NEW.github_updated_at IS NULL OR NEW.github_updated_at < OLD.github_updated_at)
      ) THEN
     NEW := OLD;
     NEW.is_flaky := OLD.is_flaky;
@@ -56,8 +67,7 @@ SET search_path = ''
 AS $function$
 BEGIN
   IF OLD.github_updated_at IS NOT NULL
-     AND NEW.github_updated_at IS NOT NULL
-     AND NEW.github_updated_at < OLD.github_updated_at THEN
+     AND (NEW.github_updated_at IS NULL OR NEW.github_updated_at < OLD.github_updated_at) THEN
     NEW := OLD;
   END IF;
   RETURN NEW;
@@ -82,7 +92,7 @@ CREATE TABLE public.pending_workflow_jobs (
   started_at timestamptz,
   completed_at timestamptz,
   source_delivery_id text,
-  expires_at timestamptz NOT NULL DEFAULT (now() + interval '24 hours'),
+  expires_at timestamptz NOT NULL DEFAULT (now() + interval '7 days'),
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX pending_workflow_jobs_run_expiry_idx
@@ -173,5 +183,12 @@ ALTER TABLE public.alerts_sent
   ));
 CREATE INDEX alerts_sent_due_idx
   ON public.alerts_sent(status, available_at, created_at);
+
+-- Rows left in the legacy processing state have an unknowable provider outcome:
+-- never resend them automatically after this state-machine upgrade.
+UPDATE public.alerts_sent
+SET status = 'delivery_unknown',
+    failure_code = 'PRE_MIGRATION_DELIVERY_OUTCOME_UNKNOWN'
+WHERE status = 'processing';
 
 COMMIT;
