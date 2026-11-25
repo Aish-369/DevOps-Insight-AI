@@ -195,7 +195,7 @@ class MockSupabaseQuery implements PromiseLike<{ data: unknown; error: null }> {
     return Promise.resolve({ error: null });
   }
 
-  async maybeSingle(): Promise<{ data: unknown; error: null }> {
+  maybeSingle(): Promise<{ data: unknown; error: null }> {
     const matches = (expected: MockFilter[]) =>
       expected.every((filter) =>
         this.filters.some((actual) =>
@@ -210,13 +210,13 @@ class MockSupabaseQuery implements PromiseLike<{ data: unknown; error: null }> {
         { column: "deleted_at", value: null },
       ])
     ) {
-      return {
+      return Promise.resolve({
         data: {
           installation_id: this.config.installationId,
           team_id: this.config.teamId,
         },
         error: null,
-      };
+      });
     }
 
     if (
@@ -243,7 +243,7 @@ class MockSupabaseQuery implements PromiseLike<{ data: unknown; error: null }> {
       };
     }
 
-    return { data: null, error: null };
+    return Promise.resolve({ data: null, error: null });
   }
 
   then<TResult1 = { data: unknown; error: null }, TResult2 = never>(
