@@ -391,7 +391,6 @@ async function processWorkflowRun(
 async function processWorkflowJob(
   admin: AdminClient,
   teamId: string,
-  repositoryId: number,
   deliveryId: string,
   payload: JsonObject,
 ): Promise<void> {
@@ -879,7 +878,6 @@ Deno.serve(async (request: Request) => {
       await processWorkflowJob(
         admin,
         installation.team_id,
-        repositoryId,
         deliveryId,
         payload,
       );
