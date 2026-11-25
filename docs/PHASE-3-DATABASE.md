@@ -50,7 +50,7 @@ The original source for the already-applied workspace foundation migration was n
 
 ## CI status
 
-Database Security CI passed on head `aedf255020b55d4e83fa779e7b4d0b359735bd6b` ([run 45615109191](https://github.com/Aish-369/DevOps-Insight-AI/actions/runs/45615109191)). It applied the baseline, four hosted incremental migrations and the new branch-only reliability migration to a disposable PostgreSQL test database before running the SQL integration tests. The hosted project has not yet received the new migration.
+Database Security CI passed on head `e0ba357df823d349b4a53e7a09a9da2c15c319e7` ([run 45615723065](https://github.com/Aish-369/DevOps-Insight-AI/actions/runs/45615723065)). It applied the baseline, four hosted incremental migrations and the new branch-only reliability migration to a disposable PostgreSQL test database before running the SQL integration tests. The hosted project has not yet received the new migration.
 
 ## Production readiness boundary
 
