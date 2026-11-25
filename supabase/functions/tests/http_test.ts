@@ -125,7 +125,6 @@ Deno.test("fetchWithRetry retries GitHub primary rate-limit 403 responses", asyn
   assertEquals(calls, 2);
 });
 
-
 Deno.test("readResponseBytes reads an upstream body within its hard limit", async () => {
   const response = new Response(new Uint8Array([1, 2, 3]));
   assertEquals(
