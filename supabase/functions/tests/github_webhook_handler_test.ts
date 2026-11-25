@@ -233,14 +233,14 @@ class MockSupabaseQuery implements PromiseLike<{ data: unknown; error: null }> {
       this.config.active &&
       this.config.repositoryInstallationId === this.config.installationId
     ) {
-      return {
+      return Promise.resolve({
         data: {
           github_repo_id: this.config.repositoryId,
           installation_id: this.config.repositoryInstallationId,
           full_name: "acme/service",
         },
         error: null,
-      };
+      });
     }
 
     return Promise.resolve({ data: null, error: null });
