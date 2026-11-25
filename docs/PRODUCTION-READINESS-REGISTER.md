@@ -30,7 +30,10 @@ This register distinguishes verified implementation and database migration state
 
 ## CI verification
 
-On commit `a3180986f68aefc84bb038cfee090457caf7d5d6`, Frontend CI, Edge Functions CI and Database Security CI all passed. The follow-up database index migration and documentation update are newer commits; their CI must be checked before release.
+All three required GitHub Actions workflows passed on final verified head `ebea4674bcd6479f08f5c386a403983b4e6dd7c6`:
+- [Frontend CI](https://github.com/Aish-369/DevOps-Insight-AI/actions/runs/45627034247) — dependency audit, tests, lint, typecheck, production build, Chromium browser regression and source bundle.
+- [Edge Functions CI](https://github.com/Aish-369/DevOps-Insight-AI/actions/runs/45627034830) — Deno typecheck, lint, format and unit tests.
+- [Database Security CI](https://github.com/Aish-369/DevOps-Insight-AI/actions/runs/45627034114) — baseline plus all six incremental migrations, RLS/grants, rate-limit, workflow-attempt and FK-index assertions.
 
 ## Implementation included in the branch
 
