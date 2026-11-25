@@ -38,8 +38,8 @@
 
 ### Alerts
 - Email and Telegram destinations require a verification code before they can receive alerts.
-- Alert rules support branch filters and recovery notifications.
-- Delivery records use deduplication keys, atomic processing claims, bounded retries and a manual dispatch action.
+- Alert rules support branch filters, recovery notifications and `skip_flaky` (suppress a failed-run alert when a later retry succeeds; a 10-minute grace period allows an immediate rerun).
+- Delivery records use deduplication keys and atomic claims. Resend email uses an idempotency key; ambiguous provider outcomes become `delivery_unknown` and are never blindly retried. Check provider logs before any manual resend.
 - A five-minute GitHub Actions scheduler is included. It only activates after the required repository secrets and Supabase Edge Function secret have been configured and the workflow is present on the default branch.
 
 ## Architecture
@@ -65,7 +65,7 @@ The frontend talks to Supabase using only a publishable/anon key. The service-ro
 - No Edge Function has been deployed. Auth redirect settings, GitHub App, email, Telegram, AI and scheduler secrets remain unconfigured; the production frontend URL is still unknown.
 - Invitations, GitHub webhooks, AI analysis and alert delivery cannot be considered live until the operations guide setup and end-to-end checks are completed.
 - The original SQL source for the already-applied workspace foundation migration was absent from the repository. The file `20261112100118_create_team_workspace_foundation.sql` is a documented reconstruction from read-only catalog inspection. It was not reapplied to the existing project. Compare it with the original source before using it to provision a new database.
-- `skip_flaky` is currently a stored preference; automatic flaky-run classification is not implemented.
+- The current branch implements `skip_flaky` using durable workflow-attempt history, delayed failure alerts and suppression of unsent alerts after a successful retry. This code is not live until the pending reliability migration and Edge Functions are separately deployed.
 - On the Supabase Free plan, leaked-password protection is unavailable and its Security Advisor warning remains.
 
 ## Getting started — frontend
@@ -113,7 +113,7 @@ Edge Functions:
     deno task fmt:check
     deno task test
 
-Database CI runs PostgreSQL 17.11 in an isolated GitHub Actions service container. It creates test-only Supabase Auth primitives, applies the reconstructed workspace baseline and all four incremental migrations, then tests RLS/privileges, sensitive-column access, foreign-key indexes, cross-team isolation, owner invariants, cascade behavior and atomic AI quota. It does not connect to or modify the hosted Supabase project.
+Database CI runs PostgreSQL 17.11 in an isolated GitHub Actions service container. It creates test-only Supabase Auth primitives, applies the reconstructed workspace baseline, the four Phase 3 migrations already present on the hosted project, and the branch-only reliability migration. It tests RLS/privileges, sensitive-column access, foreign-key indexes, cross-team isolation, owner invariants, cascade behavior, atomic AI quota, shared rate-limit behavior, workflow-attempt ordering and delivery-state constraints. It does not connect to or modify the hosted Supabase project.
 
 ## Supabase and provider setup
 
