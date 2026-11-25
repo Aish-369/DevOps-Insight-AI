@@ -112,7 +112,7 @@ Edge Functions:
     deno task fmt:check
     deno task test
 
-Database CI runs PostgreSQL 17.11 in an isolated GitHub Actions service container. It creates test-only Supabase Auth primitives, applies the reconstructed workspace baseline and the new migration, then tests RLS/privileges, cross-team isolation, owner invariants, cascade behavior and atomic AI quota. It does not connect to or modify a hosted Supabase project.
+Database CI runs PostgreSQL 17.11 in an isolated GitHub Actions service container. It creates test-only Supabase Auth primitives, applies the reconstructed workspace baseline and all four incremental migrations, then tests RLS/privileges, sensitive-column access, foreign-key indexes, cross-team isolation, owner invariants, cascade behavior and atomic AI quota. It does not connect to or modify the hosted Supabase project.
 
 ## Supabase and provider setup
 
