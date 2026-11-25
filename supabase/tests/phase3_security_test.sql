@@ -9,7 +9,7 @@ BEGIN
     'github_installations','team_repositories','workflow_runs','workflow_jobs',
     'activity_events','webhook_events','failure_analyses','analysis_feedback',
     'alert_channels','alert_rules','alerts_sent','team_audit_events',
-    'github_installation_states'
+    'github_installation_states','team_ai_usage'
   ]
   LOOP
     IF NOT EXISTS (
@@ -45,6 +45,17 @@ BEGIN
   END IF;
   IF has_table_privilege('authenticated', 'public.github_installation_states', 'SELECT') THEN
     RAISE EXCEPTION 'authenticated unexpectedly has SELECT on github_installation_states';
+  END IF;
+  IF has_table_privilege('anon', 'public.team_ai_usage', 'SELECT')
+     OR has_table_privilege('authenticated', 'public.team_ai_usage', 'SELECT') THEN
+    RAISE EXCEPTION 'client roles can read private AI usage counters';
+  END IF;
+  IF has_function_privilege('anon', 'public.claim_team_ai_analysis(uuid)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.claim_team_ai_analysis(uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'client roles can claim server-side AI quota';
+  END IF;
+  IF NOT has_function_privilege('service_role', 'public.claim_team_ai_analysis(uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'service role cannot claim AI quota';
   END IF;
   IF has_schema_privilege('anon', 'private', 'USAGE') THEN
     RAISE EXCEPTION 'anon unexpectedly has USAGE on private schema';
@@ -110,6 +121,28 @@ INSERT INTO public.profiles(id, display_name) VALUES
 INSERT INTO public.teams(id, name, owner_id) VALUES
   ('10000000-0000-0000-0000-000000000001', 'Team One', '00000000-0000-0000-0000-000000000001'),
   ('10000000-0000-0000-0000-000000000002', 'Team Two', '00000000-0000-0000-0000-000000000002');
+
+INSERT INTO public.alert_rules(team_id, daily_ai_cap)
+VALUES ('10000000-0000-0000-0000-000000000001', 1);
+
+SET LOCAL ROLE service_role;
+DO $ai_quota$
+DECLARE
+  first_claim boolean;
+  second_claim boolean;
+BEGIN
+  SELECT public.claim_team_ai_analysis('10000000-0000-0000-0000-000000000001')
+  INTO first_claim;
+  SELECT public.claim_team_ai_analysis('10000000-0000-0000-0000-000000000001')
+  INTO second_claim;
+  IF first_claim IS DISTINCT FROM true OR second_claim IS DISTINCT FROM false THEN
+    RAISE EXCEPTION 'Daily AI quota was not enforced atomically';
+  END IF;
+END
+$ai_quota$;
+RESET ROLE;
+
+
 
 -- The owner invariant is enforced by a trigger even for service-role mutations.
 DO $owner_guard$
@@ -193,7 +226,24 @@ INSERT INTO public.teams(name, owner_id) VALUES
   ('New Team', '00000000-0000-0000-0000-000000000002');
 RESET ROLE;
 
-DO $$
+-- Workspace deletion must still cascade through the last owner membership.
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',true);
+DELETE FROM public.teams WHERE id = '10000000-0000-0000-0000-000000000002';
+RESET ROLE;
+
+DO $workspace_delete$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.teams WHERE id = '10000000-0000-0000-0000-000000000002') THEN
+    RAISE EXCEPTION 'Workspace owner could not delete their workspace';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.team_members WHERE team_id = '10000000-0000-0000-0000-000000000002') THEN
+    RAISE EXCEPTION 'Workspace membership cascade did not complete';
+  END IF;
+END
+$workspace_delete$;
+
+DO $
 DECLARE
   new_team_id uuid;
 BEGIN

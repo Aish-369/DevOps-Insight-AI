@@ -166,6 +166,12 @@ BEGIN
   END IF;
 
   PERFORM 1 FROM public.teams t WHERE t.id = target_team_id FOR UPDATE;
+  -- A workspace deletion cascades to memberships. Its parent row is already
+  -- being deleted, so do not block the intentional cascade on the owner guard.
+  IF NOT FOUND THEN
+    IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    RETURN NEW;
+  END IF;
 
   SELECT count(*) INTO remaining_owners
   FROM public.team_members tm
