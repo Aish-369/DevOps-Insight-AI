@@ -38,7 +38,7 @@ On commit `a3180986f68aefc84bb038cfee090457caf7d5d6`, Frontend CI, Edge Function
 - Out-of-order workflow-job webhooks are persisted as normalized pending rows (not raw webhook bodies) and reconciled after parent-run arrival; unmatched rows expire after seven days.
 - Workflow attempt history preserves retries; stale events cannot roll back the latest run snapshot. With `skip_flaky` enabled, a failed attempt followed by a successful later attempt suppresses unsent failure alerts. The failure alert waits for a 10-minute grace period.
 - Alert dispatch distinguishes pre-send claims from provider sends. Ambiguous outcomes become `delivery_unknown` and are excluded from automatic retries. Resend email uses a stable idempotency key; Telegram unknown outcomes require provider-side checking before manual resend.
-- New reliability schema migration and FK-index follow-up migration are applied to hosted Supabase and present in the working branch.
+- New reliability schema migration and FK-index follow-up migration are applied to hosted Supabase and present in the working branch. The canonical migration filename matches hosted version `20261125134153`; the earlier `20261125112000` path is a no-op placeholder retained for history.
 - These behaviors are not live yet because Edge Functions have not been deployed.
 
 ## Deployment blockers
