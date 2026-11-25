@@ -497,7 +497,58 @@ Deno.serve(async (request: Request) => {
       return jsonResponse(request, { ok: true, unmatched: true });
     }
 
-    if (eventType === "workflow_run") {
+    if (eventType === "installation_repositories") {
+      const added = Array.isArray(payload.repositories_added) ? payload.repositories_added : [];
+      const removed = Array.isArray(payload.repositories_removed) ? payload.repositories_removed : [];
+      const syncedAt = new Date().toISOString();
+
+      const removedIds = removed
+        .map((repository) => numberAt(repository, "id"))
+        .filter((id): id is number => id !== null);
+      if (removedIds.length > 0) {
+        const { error } = await admin.from("team_repositories")
+          .update({ active: false, last_synced_at: syncedAt })
+          .eq("team_id", installation.team_id)
+          .eq("installation_id", installationId)
+          .in("github_repo_id", removedIds);
+        if (error) {
+          throw new HttpError(500, "GITHUB_REPOSITORY_REMOVE_FAILED", "Removed GitHub repositories could not be reconciled.");
+        }
+      }
+
+      const addedRows = added.flatMap((value) => {
+        if (!isObject(value)) return [];
+        const id = numberAt(value, "id");
+        const fullName = stringAt(value, "full_name");
+        if (!id || !fullName) return [];
+        return [{
+          github_repo_id: id,
+          team_id: installation.team_id,
+          installation_id: installationId,
+          full_name: fullName,
+          default_branch: stringAt(value, "default_branch"),
+          is_private: value.private === true,
+          archived: value.archived === true,
+          active: true,
+          last_synced_at: syncedAt,
+        }];
+      });
+      if (addedRows.length > 0) {
+        const { error } = await admin.from("team_repositories")
+          .upsert(addedRows, { onConflict: "github_repo_id" });
+        if (error) {
+          throw new HttpError(500, "GITHUB_REPOSITORY_ADD_FAILED", "New GitHub repositories could not be reconciled.");
+        }
+      }
+
+      const { error: installError } = await admin.from("github_installations")
+        .update({ last_reconciled_at: syncedAt })
+        .eq("installation_id", installationId)
+        .eq("team_id", installation.team_id);
+      if (installError) {
+        throw new HttpError(500, "GITHUB_INSTALLATION_RECONCILE_FAILED", "GitHub installation state could not be reconciled.");
+      }
+    } else if (eventType === "workflow_run") {
       if (
         !repositoryId ||
         !(await repositoryBelongsToTeam(
