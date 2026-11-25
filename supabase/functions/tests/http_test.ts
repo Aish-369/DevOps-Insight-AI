@@ -4,6 +4,7 @@ import {
   fetchWithTimeout,
   HttpError,
   readJsonObject,
+  readResponseBytes,
 } from "../_shared/http.ts";
 
 Deno.test("readJsonObject parses a bounded JSON object", async () => {
@@ -122,4 +123,47 @@ Deno.test("fetchWithRetry retries GitHub primary rate-limit 403 responses", asyn
   );
   assertEquals(response.status, 200);
   assertEquals(calls, 2);
+});
+
+
+Deno.test("readResponseBytes reads an upstream body within its hard limit", async () => {
+  const response = new Response(new Uint8Array([1, 2, 3]));
+  assertEquals(
+    Array.from(await readResponseBytes(response, 3)),
+    [1, 2, 3],
+  );
+});
+
+Deno.test("readResponseBytes rejects oversized streamed bodies without content length", async () => {
+  const response = new Response(new Uint8Array([1, 2, 3, 4, 5]));
+  const error = await assertRejects(
+    () => readResponseBytes(response, 4, "ARCHIVE_TOO_LARGE"),
+    HttpError,
+  );
+  assertEquals(error.status, 413);
+  assertEquals(error.code, "ARCHIVE_TOO_LARGE");
+});
+
+Deno.test("readResponseBytes enforces the stream cap when content length is misleading", async () => {
+  const response = new Response(new Uint8Array([1, 2, 3, 4, 5]), {
+    headers: { "content-length": "2" },
+  });
+  const error = await assertRejects(
+    () => readResponseBytes(response, 4, "ARCHIVE_TOO_LARGE"),
+    HttpError,
+  );
+  assertEquals(error.status, 413);
+  assertEquals(error.code, "ARCHIVE_TOO_LARGE");
+});
+
+Deno.test("readResponseBytes rejects a declared oversized body before reading it", async () => {
+  const response = new Response(new Uint8Array([1, 2]), {
+    headers: { "content-length": "20" },
+  });
+  const error = await assertRejects(
+    () => readResponseBytes(response, 4, "ARCHIVE_TOO_LARGE"),
+    HttpError,
+  );
+  assertEquals(error.status, 413);
+  assertEquals(error.code, "ARCHIVE_TOO_LARGE");
 });
