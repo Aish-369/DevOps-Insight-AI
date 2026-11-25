@@ -5,69 +5,87 @@ Repository: `Aish-369/DevOps-Insight-AI`
 Working branch: `codex/phase3-platform-backend-2026-11-24`  
 Confirmed Supabase target: `mtrmvvtobbbjusiteyvp`
 
-This register distinguishes verified implementation from live deployment. A passing isolated CI run is not proof that external providers or production workflows are operational.
+This register distinguishes verified implementation and database migration state from live deployment. Passing isolated CI is not proof that external providers or production workflows are operational.
 
-## Verified
+## Verified implementation and hosted database
 
-- The confirmed Supabase project is `ACTIVE_HEALTHY`.
-- Hosted migration history contains the pre-existing workspace baseline and four incremental Phase 3 migrations:
-  - `20261112100118_create_team_workspace_foundation`
+- Confirmed Supabase project is `ACTIVE_HEALTHY`, PostgreSQL 17.11.
+- Hosted migration history contains seven migrations:
+  - `20261112100118_create_team_workspace_foundation` (pre-existing baseline)
   - `20261125111227_secure_workspace_data_plane`
   - `20261125111400_index_phase3_foreign_keys`
   - `20261125111523_restrict_sensitive_workspace_columns`
   - `20261125111715_deny_client_access_to_internal_tables`
-- All 19 public application tables have RLS enabled.
-- The three internal tables `webhook_events`, `github_installation_states` and `team_ai_usage` have explicit client-deny policies.
-- The live database currently contains 3 profile rows; the other 18 application tables have zero rows.
-- Security Advisor: leaked-password protection is disabled. Supabase documents this control as Pro-and-above; the warning remains on the Free plan.
-- Performance Advisor: 32 unused-index informational findings. Do not drop these without workload evidence.
-- Health Advisor: no findings.
-- The confirmed project currently has zero deployed Edge Functions.
-- The PR #10 code tree passed Frontend CI, Edge Functions CI and Database Security CI on its PR head. The source branch's later hardening changes are tracked by the latest Actions runs and must be rechecked before release.
+  - `20261125134153_reliable_event_delivery`
+  - `20261125134241_index_workflow_run_attempts_fk`
+- Live row counts verified: 3 profiles; 0 teams; 0 workflow runs; 0 workflow attempts; 0 pending workflow jobs; 0 alerts; 0 rate-limit buckets.
+- All public application tables, including `workflow_run_attempts` and `pending_workflow_jobs`, have RLS enabled. Client roles have no table access to the new internal workflow tables.
+- `private.api_rate_limits` is in a non-exposed schema and has no client table grants; `service_role` has required write access and can execute the rate-limit RPC. However, RLS is currently disabled on this private table and Supabase Security Advisor flags it. See the explicit owner decision below.
+- Rate-limit RPC is not executable by `anon` or `authenticated`; it is executable by `service_role`.
+- The composite foreign-key index for workflow attempt history is present. A live catalog query reports zero unindexed foreign keys.
+- Supabase Health Advisor: no findings.
+- Supabase Security Advisor: one warning — leaked-password protection is disabled. Supabase Free plan does not include the HaveIBeenPwned feature.
+- Supabase Performance Advisor: 36 unused-index informational findings. No indexes were dropped; assess only after representative workload data exists.
+- Zero Edge Functions are deployed.
+
+## CI verification
+
+On commit `a3180986f68aefc84bb038cfee090457caf7d5d6`, Frontend CI, Edge Functions CI and Database Security CI all passed. The follow-up database index migration and documentation update are newer commits; their CI must be checked before release.
+
+## Implementation included in the branch
+
+- Authenticated Edge Function requests use atomic database-backed fixed-window rate limiting: 60 requests per user/function/minute, SHA-256 key hashes and fail-closed behavior.
+- Out-of-order workflow-job webhooks are persisted as normalized pending rows (not raw webhook bodies) and reconciled after parent-run arrival; unmatched rows expire after seven days.
+- Workflow attempt history preserves retries; stale events cannot roll back the latest run snapshot. With `skip_flaky` enabled, a failed attempt followed by a successful later attempt suppresses unsent failure alerts. The failure alert waits for a 10-minute grace period.
+- Alert dispatch distinguishes pre-send claims from provider sends. Ambiguous outcomes become `delivery_unknown` and are excluded from automatic retries. Resend email uses a stable idempotency key; Telegram unknown outcomes require provider-side checking before manual resend.
+- New reliability schema migration and FK-index follow-up migration are applied to hosted Supabase and present in the working branch.
+- These behaviors are not live yet because Edge Functions have not been deployed.
 
 ## Deployment blockers
 
 | Item | Status | Required next action |
 |---|---|---|
-| Production frontend URL | BLOCKED | Owner must provide the deployed HTTPS origin |
-| Frontend Supabase environment | BLOCKED | Set the confirmed project's URL and publishable key in hosting configuration |
-| Supabase Auth URL settings | BLOCKED | Configure Site URL and exact callback/reset allow-list after domain confirmation |
-| Auth email/OAuth provider | NOT TESTED | Configure actual provider/SMTP and verify with controlled accounts |
-| Edge Function secrets | BLOCKED | Configure only the providers the owner chooses in Supabase Dashboard |
-| GitHub App | NOT TESTED | Supply App ID/slug/private key/webhook secret through secure secret settings |
+| Production frontend HTTPS origin | BLOCKED | Owner must provide the exact deployed URL/origin |
+| Frontend Supabase environment | BLOCKED | Configure project URL and publishable key in frontend host |
+| Supabase Auth URL settings | BLOCKED | Set Site URL and exact callback/reset allow-list after origin is known |
+| Auth email/OAuth provider | NOT TESTED | Configure actual provider/SMTP and verify controlled accounts |
+| Edge Function secrets | BLOCKED | Configure chosen providers securely in Supabase Dashboard |
+| GitHub App | NOT TESTED | Configure App ID/slug/private key/webhook secret through secure settings |
 | Email alerts/invitations | NOT TESTED | Configure Resend and verified sender if email is enabled |
 | Telegram alerts | NOT TESTED | Configure bot token if Telegram is enabled |
-| AI analysis | NOT TESTED | Choose and configure an approved OpenAI-compatible provider/model |
-| Scheduler | BLOCKED | Configure GitHub repository secrets and verify authenticated dispatch |
-| Edge Function deployment | BLOCKED | Deploy only after origin/secrets/source checks; no functions are currently deployed |
+| AI analysis | NOT TESTED | Select and configure approved OpenAI-compatible provider/model |
+| GitHub scheduler | BLOCKED | Add `SUPABASE_FUNCTIONS_URL` and matching `ALERT_SCHEDULER_SECRET` repository secrets |
+| Edge Function deployment | BLOCKED | Deploy only after exact frontend origin and required secrets are configured |
 | Live end-to-end acceptance | NOT TESTED | Use controlled accounts and a non-production GitHub repository |
 
-Never paste secret values into chat or commit them to Git.
+Never paste secret values into chat or commit them to Git. Set secrets in the Supabase Dashboard and GitHub Actions secret settings.
 
-## Implementation changes on the current branch — CI verified
+## Explicit security-advisor item requiring owner decision
 
-- User-authenticated Edge Function requests now use an atomic database-backed fixed-window limiter: 60 requests per user per function per minute. The key is a SHA-256 hash; the limiter fails closed if its database RPC is unavailable. GitHub webhooks remain protected by HMAC verification and delivery deduplication; the scheduler uses its independent shared secret.
-- Workflow-job events received before their parent run are stored as normalized fields (never raw webhook bodies) in `pending_workflow_jobs`. Parent-run synchronization reconciles those rows; the job handler rechecks the parent after inserting to close the event-order race. Unmatched pending jobs expire after seven days.
-- `workflow_run_attempts` retains each attempt and database triggers prevent stale attempt events from rolling back the latest run snapshot. With `skip_flaky` enabled, a failure followed by a successful latest attempt is classified as flaky and pending/pre-send failure alerts are suppressed. Failure alerts have a 10-minute grace period to allow an immediate rerun to arrive. Alerts already sent cannot be recalled.
-- Alert dispatch now separates the pre-send `processing` claim from provider `sending`. Stale `sending` rows become `delivery_unknown` and are never automatically retried, preventing duplicate Telegram sends when provider acceptance is ambiguous. Resend email requests also carry a stable idempotency key. Unknown outcomes require provider-side reconciliation before any manual resend.
-- Request JSON is streamed with a 16 KB limit; GitHub webhook bodies are streamed with a 2 MB limit. AI log ZIP extraction has per-file, file-count and aggregate expansion limits. GitHub API GET/HEAD requests use bounded timeout handling and up to two transient-error retries.
-- The new migration `20261125112000_reliable_event_delivery.sql` is in the branch and covered by Database Security CI, but has **not** been applied to the hosted Supabase project.
-- Final code verification on head `e0ba357df823d349b4a53e7a09a9da2c15c319e7`: [Frontend CI passed](https://github.com/Aish-369/DevOps-Insight-AI/actions/runs/45615723260), [Edge Functions CI passed](https://github.com/Aish-369/DevOps-Insight-AI/actions/runs/45615710408), and [Database Security CI passed](https://github.com/Aish-369/DevOps-Insight-AI/actions/runs/45615723065). The database run applied the pending migration only to its disposable PostgreSQL test database, not the hosted Supabase project.
-- Current Playwright tests mock the Supabase Auth HTTP boundary. They do not verify live signup, confirmation email, OAuth, password recovery, team isolation, GitHub App, AI, or alert delivery.
+Supabase Security Advisor flags `private.api_rate_limits` because RLS is disabled. The table is in the non-exposed `private` schema and direct table privileges are revoked from `PUBLIC`, `anon`, and `authenticated`; only `service_role` has access. This is not currently a client-accessible table, but RLS is useful defense-in-depth.
 
-## Migration provenance warning
+Proposed hardening SQL (not applied):
 
-The original source SQL for the already-applied workspace foundation migration was not available in the repository. The repository file `20261112100118_create_team_workspace_foundation.sql` is a documented reconstruction from read-only catalog inspection. It was not reapplied to the existing hosted project. Do not use it to overwrite or provision another database until compared with the original source.
+```sql
+ALTER TABLE private.api_rate_limits ENABLE ROW LEVEL SECURITY;
+CREATE POLICY api_rate_limits_service_role_only
+  ON private.api_rate_limits
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+```
+
+Do not apply until the owner confirms this policy choice. The Supabase advisor's RLS warning must remain visible until resolved.
 
 ## Git branch / review state
 
-- PR #9 (Phase 2) was merged into the Phase 1 branch.
-- PR #10 (Phase 3) was merged into the Phase 2 branch.
-- PR #8 (Phase 1 to `main`) remains open.
-- The phase chain has not yet been merged into `main`. Do not merge or deploy as part of this work without explicit owner approval.
+- PR #11 remains open and draft; it has not been merged.
+- The current Phase 3 branch is based on the Phase 2 branch; the phase chain to `main` is not complete.
+- Do not merge PRs or deploy without explicit owner approval.
 
 ## Release decision
 
-**NOT PRODUCTION READY — BLOCKERS REMAIN**
+**NOT PRODUCTION READY — EXTERNAL CONFIGURATION AND LIVE ACCEPTANCE REMAIN.**
 
-Do not change this decision until all required CI checks on the final commit, hosted deployment checks, provider integrations, authorization tests and end-to-end acceptance tests have passed with recorded evidence.
+Do not change this decision until final-commit CI, frontend hosting, Auth configuration, secrets, Edge Function deployment, provider integration and end-to-end acceptance checks all pass.
