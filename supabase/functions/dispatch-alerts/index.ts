@@ -41,9 +41,9 @@ Deno.serve(async (request: Request) => {
 
     const { data: pending, error } = await context.admin
       .from("alerts_sent")
-      .select("id,team_id,channel_id,github_run_id,kind,dedupe_key")
+      .select("id,team_id,channel_id,github_run_id,kind,dedupe_key,status,attempt_count")
       .eq("team_id", teamId)
-      .eq("status", "pending")
+      .or("status.eq.pending,and(status.eq.processing,claimed_at.lt." + new Date(Date.now() - 5 * 60 * 1000).toISOString() + ")")
       .order("created_at", { ascending: true })
       .limit(25);
 
@@ -59,6 +59,28 @@ Deno.serve(async (request: Request) => {
     let failed = 0;
     for (const alert of pending ?? []) {
       const attemptedAt = new Date().toISOString();
+      const nextAttempt = Number(alert.attempt_count ?? 0) + 1;
+      const { data: claim, error: claimError } = await context.admin
+        .from("alerts_sent")
+        .update({
+          status: "processing",
+          attempt_count: nextAttempt,
+          claimed_at: attemptedAt,
+          attempted_at: attemptedAt,
+        })
+        .eq("id", alert.id)
+        .eq("team_id", teamId)
+        .eq("status", alert.status)
+        .eq("attempt_count", alert.attempt_count ?? 0)
+        .select("id")
+        .maybeSingle();
+
+      if (claimError) {
+        failed += 1;
+        continue;
+      }
+      if (!claim) continue;
+
       try {
         const [
           { data: channel, error: channelError },
@@ -135,7 +157,8 @@ Deno.serve(async (request: Request) => {
           })
           .eq("id", alert.id)
           .eq("team_id", teamId)
-          .eq("status", "pending");
+          .eq("status", "processing")
+          .eq("attempt_count", nextAttempt);
 
         if (updateError) {
           throw new Error("Alert delivery status could not be saved.");
@@ -146,7 +169,10 @@ Deno.serve(async (request: Request) => {
           status: "failed",
           attempted_at: attemptedAt,
           failure_code: "PROVIDER_DELIVERY_FAILED",
-        }).eq("id", alert.id).eq("team_id", teamId).eq("status", "pending");
+        }).eq("id", alert.id)
+          .eq("team_id", teamId)
+          .eq("status", "processing")
+          .eq("attempt_count", nextAttempt);
         failed += 1;
       }
     }

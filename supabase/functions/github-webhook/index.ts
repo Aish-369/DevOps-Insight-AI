@@ -356,14 +356,16 @@ Deno.serve(async (request: Request) => {
     installation_id: installationId,
     github_repo_id: repositoryId,
     payload_sha256: payloadHash,
-    status: "received",
+    status: "processing",
+    attempts: 1,
+    processing_started_at: new Date().toISOString(),
   });
 
   let deliveryAttempt = 1;
   if (deliveryError?.code === "23505") {
     const { data: existingDelivery, error: lookupError } = await admin
       .from("webhook_events")
-      .select("status,attempts")
+      .select("status,attempts,processing_started_at,dead")
       .eq("delivery_id", deliveryId)
       .maybeSingle();
     if (lookupError || !existingDelivery) {
@@ -375,24 +377,48 @@ Deno.serve(async (request: Request) => {
     }
     if (
       existingDelivery.status === "processed" ||
-      existingDelivery.status === "unmatched"
+      existingDelivery.status === "unmatched" ||
+      existingDelivery.dead
     ) {
       return jsonResponse(request, { ok: true, duplicate: true });
     }
-    deliveryAttempt = Number(existingDelivery.attempts ?? 0) + 1;
+
+    const nowMs = Date.now();
+    const processingStartedAt = existingDelivery.processing_started_at
+      ? Date.parse(existingDelivery.processing_started_at)
+      : 0;
+    const currentlyProcessing = existingDelivery.status === "processing" &&
+      Number.isFinite(processingStartedAt) &&
+      nowMs - processingStartedAt < 5 * 60 * 1000;
+    if (currentlyProcessing) {
+      return jsonResponse(request, { ok: true, duplicate: true, processing: true });
+    }
+
+    const currentAttempts = Number(existingDelivery.attempts ?? 0);
+    if (currentAttempts >= 8) {
+      await admin.from("webhook_events")
+        .update({ dead: true })
+        .eq("delivery_id", deliveryId)
+        .eq("attempts", currentAttempts);
+      return jsonResponse(request, { ok: true, dead_lettered: true });
+    }
+
+    deliveryAttempt = currentAttempts + 1;
     const { data: retryClaim, error: retryError } = await admin
       .from("webhook_events")
       .update({
-        status: "received",
+        status: "processing",
         attempts: deliveryAttempt,
+        processing_started_at: new Date().toISOString(),
         last_error: null,
       })
       .eq("delivery_id", deliveryId)
-      .in("status", ["failed", "received"])
+      .eq("status", existingDelivery.status)
+      .eq("attempts", currentAttempts)
       .select("delivery_id")
       .maybeSingle();
     if (retryError || !retryClaim) {
-      return jsonResponse(request, { ok: true, duplicate: true });
+      return jsonResponse(request, { ok: true, duplicate: true, processing: true });
     }
   } else if (deliveryError) {
     return jsonResponse(request, { error: "WEBHOOK_RECEIVE_FAILED" }, 500);
@@ -512,6 +538,7 @@ Deno.serve(async (request: Request) => {
     await admin.from("webhook_events").update({
       status: "failed",
       attempts: deliveryAttempt,
+      dead: deliveryAttempt >= 8,
       last_error: error instanceof HttpError ? error.code : "PROCESSING_FAILED",
     }).eq("delivery_id", deliveryId);
     return jsonResponse(request, { error: "WEBHOOK_PROCESSING_FAILED" }, 500);

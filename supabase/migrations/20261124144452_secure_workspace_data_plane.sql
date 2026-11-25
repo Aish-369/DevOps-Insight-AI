@@ -305,10 +305,11 @@ CREATE TABLE public.webhook_events (
   github_repo_id bigint,
   payload_sha256 text NOT NULL CHECK (payload_sha256 ~ '^[0-9a-f]{64}$'),
   status text NOT NULL DEFAULT 'received'
-    CHECK (status IN ('received', 'processed', 'failed', 'unmatched')),
+    CHECK (status IN ('received', 'processing', 'processed', 'failed', 'unmatched')),
   attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
   last_error text,
   received_at timestamptz NOT NULL DEFAULT now(),
+  processing_started_at timestamptz,
   processed_at timestamptz,
   dead boolean NOT NULL DEFAULT false
 );
@@ -397,8 +398,10 @@ CREATE TABLE public.alerts_sent (
   kind text NOT NULL CHECK (kind IN ('failure', 'recovered')),
   dedupe_key text NOT NULL,
   status text NOT NULL
-    CHECK (status IN ('pending', 'sent', 'failed', 'skipped')),
+    CHECK (status IN ('pending', 'processing', 'sent', 'failed', 'skipped')),
   provider_message_id text,
+  attempt_count integer NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  claimed_at timestamptz,
   attempted_at timestamptz,
   sent_at timestamptz,
   failure_code text,

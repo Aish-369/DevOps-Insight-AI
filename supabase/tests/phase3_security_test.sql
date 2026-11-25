@@ -43,6 +43,20 @@ BEGIN
   IF has_table_privilege('authenticated', 'public.webhook_events', 'SELECT') THEN
     RAISE EXCEPTION 'authenticated unexpectedly has SELECT on webhook_events';
   END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.webhook_events'::regclass
+      AND pg_get_constraintdef(oid) LIKE '%processing%'
+  ) THEN
+    RAISE EXCEPTION 'webhook processing state is not constrained in the schema';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'alerts_sent'
+      AND column_name = 'attempt_count'
+  ) THEN
+    RAISE EXCEPTION 'alert delivery attempt counter is missing';
+  END IF;
   IF has_table_privilege('authenticated', 'public.github_installation_states', 'SELECT') THEN
     RAISE EXCEPTION 'authenticated unexpectedly has SELECT on github_installation_states';
   END IF;
