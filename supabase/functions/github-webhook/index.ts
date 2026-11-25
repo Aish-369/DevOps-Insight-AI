@@ -3,6 +3,7 @@ import { HttpError, jsonResponse, readRequestBytes } from "../_shared/http.ts";
 import { verifyGithubWebhookSignature } from "../_shared/webhook-security.ts";
 import { isFlakyWorkflowAttempts } from "../_shared/workflow-attempts.ts";
 import { getActiveRepositoryMapping } from "../_shared/repository-access.ts";
+import { getWebhookDeliveryDisposition } from "../_shared/webhook-delivery.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type JsonObject = Record<string, unknown>;
@@ -664,39 +665,29 @@ Deno.serve(async (request: Request) => {
         500,
       );
     }
-    if (
-      existingDelivery.status === "processed" ||
-      existingDelivery.status === "unmatched" ||
-      existingDelivery.dead
-    ) {
+    const disposition = getWebhookDeliveryDisposition(
+      existingDelivery,
+      Date.now(),
+    );
+    if (disposition.kind === "terminal_duplicate") {
       return jsonResponse(request, { ok: true, duplicate: true });
     }
-
-    const nowMs = Date.now();
-    const processingStartedAt = existingDelivery.processing_started_at
-      ? Date.parse(existingDelivery.processing_started_at)
-      : 0;
-    const currentlyProcessing = existingDelivery.status === "processing" &&
-      Number.isFinite(processingStartedAt) &&
-      nowMs - processingStartedAt < 5 * 60 * 1000;
-    if (currentlyProcessing) {
+    if (disposition.kind === "processing_duplicate") {
       return jsonResponse(request, {
         ok: true,
         duplicate: true,
         processing: true,
       });
     }
-
-    const currentAttempts = Number(existingDelivery.attempts ?? 0);
-    if (currentAttempts >= 8) {
+    if (disposition.kind === "dead_letter") {
       await admin.from("webhook_events")
         .update({ dead: true })
         .eq("delivery_id", deliveryId)
-        .eq("attempts", currentAttempts);
+        .eq("attempts", disposition.attempts);
       return jsonResponse(request, { ok: true, dead_lettered: true });
     }
 
-    deliveryAttempt = currentAttempts + 1;
+    deliveryAttempt = disposition.attempts;
     const { data: retryClaim, error: retryError } = await admin
       .from("webhook_events")
       .update({
