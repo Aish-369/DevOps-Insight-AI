@@ -34,7 +34,9 @@ function bytesToPem(label: string, bytes: Uint8Array): string {
   for (const byte of bytes) binary += String.fromCharCode(byte);
   const base64 = btoa(binary);
   const lines = base64.match(/.{1,64}/g) ?? [];
-  return `-----BEGIN ${label}-----\n${lines.join("\n")}\n-----END ${label}-----`;
+  return `-----BEGIN ${label}-----\n${
+    lines.join("\n")
+  }\n-----END ${label}-----`;
 }
 
 /**
@@ -50,7 +52,9 @@ export function normalizeGithubPrivateKeyPem(pem: string): string {
     /^-----BEGIN RSA PRIVATE KEY-----\s*([A-Za-z0-9+/=\s]+)\s*-----END RSA PRIVATE KEY-----$/,
   );
   if (!match) {
-    throw new Error("GitHub App private key must be a PKCS#1 RSA or PKCS#8 PEM key.");
+    throw new Error(
+      "GitHub App private key must be a PKCS#1 RSA or PKCS#8 PEM key.",
+    );
   }
 
   const base64 = match[1].replace(/\s+/g, "");
@@ -67,8 +71,21 @@ export function normalizeGithubPrivateKeyPem(pem: string): string {
 
   // AlgorithmIdentifier for rsaEncryption (1.2.840.113549.1.1.1) + NULL.
   const algorithmIdentifier = new Uint8Array([
-    0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01,
-    0x01, 0x05, 0x00,
+    0x30,
+    0x0d,
+    0x06,
+    0x09,
+    0x2a,
+    0x86,
+    0x48,
+    0x86,
+    0xf7,
+    0x0d,
+    0x01,
+    0x01,
+    0x01,
+    0x05,
+    0x00,
   ]);
   const version = new Uint8Array([0x02, 0x01, 0x00]);
   const privateKeyInfo = wrapDer(

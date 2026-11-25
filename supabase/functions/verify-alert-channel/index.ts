@@ -9,7 +9,11 @@ import {
   preflight,
   readJsonObject,
 } from "../_shared/http.ts";
-import { constantTimeEqual, hmacSha256Hex, randomNumericCode } from "../_shared/security.ts";
+import {
+  constantTimeEqual,
+  hmacSha256Hex,
+  randomNumericCode,
+} from "../_shared/security.ts";
 
 Deno.serve(async (request: Request) => {
   const options = preflight(request);
@@ -26,9 +30,14 @@ Deno.serve(async (request: Request) => {
     }
 
     const context = await requireAuth(request);
-    const verificationPepper = Deno.env.get("ALERT_VERIFICATION_PEPPER")?.trim();
+    const verificationPepper = Deno.env.get("ALERT_VERIFICATION_PEPPER")
+      ?.trim();
     if (!verificationPepper) {
-      throw new HttpError(503, "ALERT_VERIFICATION_NOT_CONFIGURED", "Alert destination verification is not configured.");
+      throw new HttpError(
+        503,
+        "ALERT_VERIFICATION_NOT_CONFIGURED",
+        "Alert destination verification is not configured.",
+      );
     }
     const body = await readJsonObject(request);
     const teamId = typeof body.team_id === "string" ? body.team_id : "";

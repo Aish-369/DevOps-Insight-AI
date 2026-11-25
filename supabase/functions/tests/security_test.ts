@@ -1,13 +1,13 @@
 import { assertEquals, assertMatch, assertNotEquals } from "@std/assert";
-import { importPKCS8, SignJWT, jwtVerify } from "jose";
+import { importPKCS8, jwtVerify, SignJWT } from "jose";
 import { normalizeGithubPrivateKeyPem } from "../_shared/github.ts";
 import {
   constantTimeEqual,
+  hmacSha256Hex,
   randomNumericCode,
   randomToken,
   redactSecrets,
   sha256Hex,
-  hmacSha256Hex,
 } from "../_shared/security.ts";
 
 Deno.test("sha256Hex returns a stable SHA-256 digest", async () => {
@@ -45,7 +45,10 @@ Deno.test("redactSecrets removes common GitHub credentials and bearer values", (
   assertMatch(redacted, /REDACTED/);
 });
 
-function readDerValue(bytes: Uint8Array, offset: number): { tag: number; value: Uint8Array; next: number } {
+function readDerValue(
+  bytes: Uint8Array,
+  offset: number,
+): { tag: number; value: Uint8Array; next: number } {
   const tag = bytes[offset];
   let cursor = offset + 1;
   const firstLength = bytes[cursor++];
@@ -57,7 +60,11 @@ function readDerValue(bytes: Uint8Array, offset: number): { tag: number; value: 
       length = (length << 8) | bytes[cursor++];
     }
   }
-  return { tag, value: bytes.subarray(cursor, cursor + length), next: cursor + length };
+  return {
+    tag,
+    value: bytes.subarray(cursor, cursor + length),
+    next: cursor + length,
+  };
 }
 
 Deno.test("GitHub PKCS#1 PEM private keys are normalized to usable PKCS#8", async () => {
@@ -71,7 +78,9 @@ Deno.test("GitHub PKCS#1 PEM private keys are normalized to usable PKCS#8", asyn
     true,
     ["sign", "verify"],
   );
-  const pkcs8 = new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey));
+  const pkcs8 = new Uint8Array(
+    await crypto.subtle.exportKey("pkcs8", pair.privateKey),
+  );
   const outer = readDerValue(pkcs8, 0);
   const version = readDerValue(outer.value, 0);
   const algorithm = readDerValue(outer.value, version.next);

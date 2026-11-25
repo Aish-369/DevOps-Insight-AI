@@ -104,7 +104,11 @@ Deno.serve(async (request: Request) => {
       .select("id")
       .maybeSingle();
     if (claimError || !claimedState) {
-      throw new HttpError(409, "INSTALLATION_STATE_ALREADY_USED", "This GitHub installation callback was already used. Start a new connection.");
+      throw new HttpError(
+        409,
+        "INSTALLATION_STATE_ALREADY_USED",
+        "This GitHub installation callback was already used. Start a new connection.",
+      );
     }
 
     const installation = await githubAppRequest<GithubInstallation>(
@@ -143,7 +147,6 @@ Deno.serve(async (request: Request) => {
         "The GitHub installation could not be saved.",
       );
     }
-
 
     await writeAudit(
       context.admin,

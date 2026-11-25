@@ -498,8 +498,12 @@ Deno.serve(async (request: Request) => {
     }
 
     if (eventType === "installation_repositories") {
-      const added = Array.isArray(payload.repositories_added) ? payload.repositories_added : [];
-      const removed = Array.isArray(payload.repositories_removed) ? payload.repositories_removed : [];
+      const added = Array.isArray(payload.repositories_added)
+        ? payload.repositories_added
+        : [];
+      const removed = Array.isArray(payload.repositories_removed)
+        ? payload.repositories_removed
+        : [];
       const syncedAt = new Date().toISOString();
 
       const removedIds = removed
@@ -512,7 +516,11 @@ Deno.serve(async (request: Request) => {
           .eq("installation_id", installationId)
           .in("github_repo_id", removedIds);
         if (error) {
-          throw new HttpError(500, "GITHUB_REPOSITORY_REMOVE_FAILED", "Removed GitHub repositories could not be reconciled.");
+          throw new HttpError(
+            500,
+            "GITHUB_REPOSITORY_REMOVE_FAILED",
+            "Removed GitHub repositories could not be reconciled.",
+          );
         }
       }
 
@@ -537,7 +545,11 @@ Deno.serve(async (request: Request) => {
         const { error } = await admin.from("team_repositories")
           .upsert(addedRows, { onConflict: "github_repo_id" });
         if (error) {
-          throw new HttpError(500, "GITHUB_REPOSITORY_ADD_FAILED", "New GitHub repositories could not be reconciled.");
+          throw new HttpError(
+            500,
+            "GITHUB_REPOSITORY_ADD_FAILED",
+            "New GitHub repositories could not be reconciled.",
+          );
         }
       }
 
@@ -546,7 +558,11 @@ Deno.serve(async (request: Request) => {
         .eq("installation_id", installationId)
         .eq("team_id", installation.team_id);
       if (installError) {
-        throw new HttpError(500, "GITHUB_INSTALLATION_RECONCILE_FAILED", "GitHub installation state could not be reconciled.");
+        throw new HttpError(
+          500,
+          "GITHUB_INSTALLATION_RECONCILE_FAILED",
+          "GitHub installation state could not be reconciled.",
+        );
       }
     } else if (eventType === "workflow_run") {
       if (

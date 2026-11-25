@@ -211,7 +211,6 @@ Deno.serve(async (request: Request) => {
       job = data as Record<string, unknown>;
     }
 
-
     const logText = await fetchRunLogs(
       installationId,
       repository.full_name,

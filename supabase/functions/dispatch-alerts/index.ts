@@ -30,7 +30,8 @@ function dueAlertFilter(now = Date.now()): string {
   return [
     "status.eq.pending",
     "and(status.eq.failed,attempt_count.lt." + MAX_ATTEMPTS + ")",
-    "and(status.eq.processing,claimed_at.lt." + staleBefore + ",attempt_count.lt." + MAX_ATTEMPTS + ")",
+    "and(status.eq.processing,claimed_at.lt." + staleBefore +
+    ",attempt_count.lt." + MAX_ATTEMPTS + ")",
   ].join(",");
 }
 
@@ -198,14 +199,22 @@ Deno.serve(async (request: Request) => {
   try {
     assertAllowedOrigin(request);
     if (request.method !== "POST") {
-      throw new HttpError(405, "METHOD_NOT_ALLOWED", "Use POST for this operation.");
+      throw new HttpError(
+        405,
+        "METHOD_NOT_ALLOWED",
+        "Use POST for this operation.",
+      );
     }
 
     const body = await readJsonObject(request);
 
     if (hasSchedulerAuthorization(request)) {
       if (body.mode !== "all") {
-        throw new HttpError(400, "INVALID_SCHEDULER_MODE", "The scheduler must request mode=all.");
+        throw new HttpError(
+          400,
+          "INVALID_SCHEDULER_MODE",
+          "The scheduler must request mode=all.",
+        );
       }
 
       const admin = createAdminClient();
@@ -215,10 +224,16 @@ Deno.serve(async (request: Request) => {
         .or(dueAlertFilter())
         .limit(5000);
       if (error) {
-        throw new HttpError(500, "ALERT_SCHEDULER_LOOKUP_FAILED", "Due alert workspaces could not be listed.");
+        throw new HttpError(
+          500,
+          "ALERT_SCHEDULER_LOOKUP_FAILED",
+          "Due alert workspaces could not be listed.",
+        );
       }
 
-      const teamIds = [...new Set((dueRows ?? []).map((row) => String(row.team_id)))];
+      const teamIds = [
+        ...new Set((dueRows ?? []).map((row) => String(row.team_id))),
+      ];
       const total: DispatchSummary = { processed: 0, sent: 0, failed: 0 };
       const teamErrors: string[] = [];
       for (const teamId of teamIds) {
@@ -244,7 +259,11 @@ Deno.serve(async (request: Request) => {
     const context = await requireAuth(request);
     const teamId = typeof body.team_id === "string" ? body.team_id : "";
     if (!isValidTeamId(teamId)) {
-      throw new HttpError(400, "INVALID_TEAM_ID", "A valid team ID is required.");
+      throw new HttpError(
+        400,
+        "INVALID_TEAM_ID",
+        "A valid team ID is required.",
+      );
     }
     await requireTeamRole(context, teamId);
     const result = await dispatchTeamAlerts(context.admin, teamId);

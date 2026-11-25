@@ -62,7 +62,10 @@ export function redactSecrets(input: string): string {
     );
 }
 
-export async function hmacSha256Hex(secret: string, value: string): Promise<string> {
+export async function hmacSha256Hex(
+  secret: string,
+  value: string,
+): Promise<string> {
   if (!secret) throw new Error("A non-empty HMAC secret is required.");
   const key = await crypto.subtle.importKey(
     "raw",
@@ -71,6 +74,10 @@ export async function hmacSha256Hex(secret: string, value: string): Promise<stri
     false,
     ["sign"],
   );
-  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(value));
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(value),
+  );
   return bytesToHex(new Uint8Array(signature));
 }
