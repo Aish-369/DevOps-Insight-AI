@@ -53,6 +53,23 @@ async function dispatchTeamAlerts(
 ): Promise<DispatchSummary> {
   const staleSendingBefore = new Date(Date.now() - STALE_CLAIM_MS)
     .toISOString();
+  const { error: exhaustedClaimError } = await admin
+    .from("alerts_sent")
+    .update({
+      status: "failed",
+      failure_code: "MAX_ATTEMPTS_REACHED",
+    })
+    .eq("team_id", teamId)
+    .eq("status", "processing")
+    .lt("claimed_at", staleSendingBefore)
+    .gte("attempt_count", MAX_ATTEMPTS);
+  if (exhaustedClaimError) {
+    throw new HttpError(
+      500,
+      "ALERT_CLAIM_RECONCILIATION_FAILED",
+      "Exhausted alert claims could not be reconciled.",
+    );
+  }
   const { error: staleSendingError } = await admin
     .from("alerts_sent")
     .update({
