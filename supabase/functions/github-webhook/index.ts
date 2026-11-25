@@ -101,6 +101,10 @@ async function queueAlerts(
 
   if (!channels?.length) return;
 
+  const skipFlaky = rules?.skip_flaky !== false;
+  const availableAt = kind === "failure" && skipFlaky
+    ? new Date(Date.now() + 10 * 60 * 1000).toISOString()
+    : new Date().toISOString();
   const rows = channels.map((channel) => ({
     team_id: teamId,
     channel_id: channel.id,
@@ -108,6 +112,7 @@ async function queueAlerts(
     kind,
     dedupe_key: [teamId, runId, runAttempt, kind, channel.id].join(":"),
     status: "pending",
+    available_at: availableAt,
   }));
 
   const { error } = await admin.from("alerts_sent").upsert(rows, {
@@ -116,6 +121,184 @@ async function queueAlerts(
   });
   if (error) {
     console.error("Could not queue alert deliveries", { code: error.code });
+  }
+}
+
+async function saveWorkflowJob(
+  admin: AdminClient,
+  teamId: string,
+  runId: number,
+  job: JsonObject,
+): Promise<void> {
+  const steps = Array.isArray(job.steps) ? job.steps : [];
+  const failedStep = steps.find((step) =>
+    isObject(step) && step.conclusion === "failure"
+  );
+  const { error } = await admin.from("workflow_jobs").upsert({
+    github_job_id: numberAt(job, "id"),
+    team_id: teamId,
+    github_run_id: runId,
+    name: stringAt(job, "name") ?? "GitHub Actions job",
+    status: stringAt(job, "status"),
+    conclusion: stringAt(job, "conclusion"),
+    failed_step_name: isObject(failedStep)
+      ? stringAt(failedStep, "name")
+      : null,
+    started_at: stringAt(job, "started_at"),
+    completed_at: stringAt(job, "completed_at"),
+  }, { onConflict: "github_job_id" });
+
+  if (error) {
+    throw new HttpError(
+      500,
+      "WORKFLOW_JOB_SAVE_FAILED",
+      "Workflow job data could not be saved.",
+    );
+  }
+}
+
+async function reconcilePendingWorkflowJobs(
+  admin: AdminClient,
+  teamId: string,
+  runId: number,
+): Promise<void> {
+  const now = new Date().toISOString();
+  const { data: pending, error } = await admin
+    .from("pending_workflow_jobs")
+    .select(
+      "github_job_id,name,status,conclusion,failed_step_name,started_at,completed_at",
+    )
+    .eq("team_id", teamId)
+    .eq("github_run_id", runId)
+    .gt("expires_at", now)
+    .order("created_at", { ascending: true })
+    .limit(100);
+
+  if (error) {
+    throw new HttpError(
+      500,
+      "PENDING_WORKFLOW_JOBS_LOOKUP_FAILED",
+      "Pending workflow jobs could not be reconciled.",
+    );
+  }
+
+  for (const pendingJob of pending ?? []) {
+    await saveWorkflowJob(admin, teamId, runId, {
+      id: pendingJob.github_job_id,
+      name: pendingJob.name,
+      status: pendingJob.status,
+      conclusion: pendingJob.conclusion,
+      steps: pendingJob.failed_step_name
+        ? [{ name: pendingJob.failed_step_name, conclusion: "failure" }]
+        : [],
+      started_at: pendingJob.started_at,
+      completed_at: pendingJob.completed_at,
+    });
+    const { error: deleteError } = await admin
+      .from("pending_workflow_jobs")
+      .delete()
+      .eq("github_job_id", pendingJob.github_job_id)
+      .eq("team_id", teamId);
+    if (deleteError) {
+      throw new HttpError(
+        500,
+        "PENDING_WORKFLOW_JOB_DELETE_FAILED",
+        "A reconciled workflow job could not be finalized.",
+      );
+    }
+  }
+
+  const { error: expiryError } = await admin
+    .from("pending_workflow_jobs")
+    .delete()
+    .eq("team_id", teamId)
+    .lte("expires_at", now);
+  if (expiryError) {
+    throw new HttpError(
+      500,
+      "PENDING_WORKFLOW_JOB_CLEANUP_FAILED",
+      "Expired pending workflow jobs could not be cleaned up.",
+    );
+  }
+}
+
+async function reconcileFlakyRun(
+  admin: AdminClient,
+  teamId: string,
+  runId: number,
+): Promise<void> {
+  const { data: attempts, error } = await admin
+    .from("workflow_run_attempts")
+    .select("run_attempt,status,conclusion")
+    .eq("team_id", teamId)
+    .eq("github_run_id", runId)
+    .order("run_attempt", { ascending: true });
+
+  if (error) {
+    throw new HttpError(
+      500,
+      "WORKFLOW_ATTEMPTS_LOOKUP_FAILED",
+      "Workflow retry history could not be checked.",
+    );
+  }
+
+  const latest = attempts?.[attempts.length - 1];
+  const hasEarlierFailure = Boolean(
+    latest && attempts?.some((attempt) =>
+      attempt.run_attempt < latest.run_attempt &&
+      attempt.conclusion === "failure"
+    ),
+  );
+  if (
+    !latest || latest.status !== "completed" ||
+    latest.conclusion !== "success" || !hasEarlierFailure
+  ) return;
+
+  const { error: runError } = await admin
+    .from("workflow_runs")
+    .update({ is_flaky: true })
+    .eq("team_id", teamId)
+    .eq("github_run_id", runId);
+  if (runError) {
+    throw new HttpError(
+      500,
+      "FLAKY_RUN_CLASSIFICATION_FAILED",
+      "Workflow retry classification could not be saved.",
+    );
+  }
+
+  const { data: rules, error: ruleError } = await admin
+    .from("alert_rules")
+    .select("skip_flaky")
+    .eq("team_id", teamId)
+    .maybeSingle();
+  if (ruleError) {
+    throw new HttpError(
+      500,
+      "FLAKY_ALERT_RULE_LOOKUP_FAILED",
+      "Flaky alert preferences could not be loaded.",
+    );
+  }
+  if (rules?.skip_flaky === false) return;
+
+  // A delivery already in the provider's sending phase cannot be recalled.
+  // Pending/pre-send claims are safely suppressed; the dispatcher rechecks status.
+  const { error: skipError } = await admin
+    .from("alerts_sent")
+    .update({
+      status: "skipped",
+      failure_code: "SKIPPED_FLAKY_RUN",
+    })
+    .eq("team_id", teamId)
+    .eq("github_run_id", runId)
+    .eq("kind", "failure")
+    .in("status", ["pending", "processing"]);
+  if (skipError) {
+    throw new HttpError(
+      500,
+      "FLAKY_ALERT_SUPPRESSION_FAILED",
+      "Pending flaky-run alerts could not be suppressed.",
+    );
   }
 }
 
@@ -139,6 +322,7 @@ async function processWorkflowRun(
   const status = stringAt(run, "status");
   const conclusion = stringAt(run, "conclusion");
   const branch = stringAt(run, "head_branch");
+  const githubUpdatedAt = stringAt(run, "updated_at");
 
   const { error } = await admin.from("workflow_runs").upsert({
     github_run_id: runId,
@@ -156,7 +340,7 @@ async function processWorkflowRun(
     html_url: stringAt(run, "html_url"),
     run_started_at: stringAt(run, "run_started_at"),
     completed_at: stringAt(run, "completed_at"),
-    github_updated_at: stringAt(run, "updated_at"),
+    github_updated_at: githubUpdatedAt,
   }, { onConflict: "github_run_id" });
 
   if (error) {
@@ -166,14 +350,37 @@ async function processWorkflowRun(
       "Workflow run data could not be saved.",
     );
   }
+
+  const { error: attemptError } = await admin
+    .from("workflow_run_attempts")
+    .upsert({
+      github_run_id: runId,
+      team_id: teamId,
+      run_attempt: runAttempt,
+      status,
+      conclusion,
+      completed_at: stringAt(run, "completed_at"),
+      github_updated_at: githubUpdatedAt,
+    }, { onConflict: "github_run_id,run_attempt" });
+  if (attemptError) {
+    throw new HttpError(
+      500,
+      "WORKFLOW_ATTEMPT_SAVE_FAILED",
+      "Workflow attempt history could not be saved.",
+    );
+  }
+
+  await reconcilePendingWorkflowJobs(admin, teamId, runId);
   if (status === "completed") {
     await queueAlerts(admin, teamId, runId, runAttempt, branch, conclusion);
+    await reconcileFlakyRun(admin, teamId, runId);
   }
 }
 
 async function processWorkflowJob(
   admin: AdminClient,
   teamId: string,
+  deliveryId: string,
   payload: JsonObject,
 ): Promise<void> {
   const job = objectAt(payload, "workflow_job");
@@ -194,38 +401,76 @@ async function processWorkflowJob(
     .eq("github_run_id", runId)
     .maybeSingle();
 
-  if (parentError || !parentRun) {
+  if (parentError) {
     throw new HttpError(
-      409,
-      "WORKFLOW_RUN_NOT_FOUND",
-      "The parent workflow run has not been synchronized yet.",
+      500,
+      "WORKFLOW_RUN_LOOKUP_FAILED",
+      "The parent workflow run could not be checked.",
     );
+  }
+  if (parentRun) {
+    await saveWorkflowJob(admin, teamId, runId, job);
+    return;
   }
 
   const steps = Array.isArray(job.steps) ? job.steps : [];
   const failedStep = steps.find((step) =>
     isObject(step) && step.conclusion === "failure"
   );
-  const { error } = await admin.from("workflow_jobs").upsert({
-    github_job_id: jobId,
-    team_id: teamId,
-    github_run_id: runId,
-    name: stringAt(job, "name") ?? "GitHub Actions job",
-    status: stringAt(job, "status"),
-    conclusion: stringAt(job, "conclusion"),
-    failed_step_name: isObject(failedStep)
-      ? stringAt(failedStep, "name")
-      : null,
-    started_at: stringAt(job, "started_at"),
-    completed_at: stringAt(job, "completed_at"),
-  }, { onConflict: "github_job_id" });
-
-  if (error) {
+  const { error: pendingError } = await admin
+    .from("pending_workflow_jobs")
+    .upsert({
+      github_job_id: jobId,
+      team_id: teamId,
+      github_run_id: runId,
+      name: stringAt(job, "name") ?? "GitHub Actions job",
+      status: stringAt(job, "status"),
+      conclusion: stringAt(job, "conclusion"),
+      failed_step_name: isObject(failedStep)
+        ? stringAt(failedStep, "name")
+        : null,
+      started_at: stringAt(job, "started_at"),
+      completed_at: stringAt(job, "completed_at"),
+      source_delivery_id: deliveryId,
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    }, { onConflict: "github_job_id" });
+  if (pendingError) {
     throw new HttpError(
       500,
-      "WORKFLOW_JOB_SAVE_FAILED",
-      "Workflow job data could not be saved.",
+      "PENDING_WORKFLOW_JOB_SAVE_FAILED",
+      "The out-of-order workflow job could not be queued.",
     );
+  }
+
+  // Close the race where the parent run is created between the first lookup
+  // and insertion of the pending child event.
+  const { data: recheckedParent, error: recheckError } = await admin
+    .from("workflow_runs")
+    .select("github_run_id")
+    .eq("team_id", teamId)
+    .eq("github_run_id", runId)
+    .maybeSingle();
+  if (recheckError) {
+    throw new HttpError(
+      500,
+      "WORKFLOW_RUN_RECHECK_FAILED",
+      "The parent workflow run could not be rechecked.",
+    );
+  }
+  if (recheckedParent) {
+    await saveWorkflowJob(admin, teamId, runId, job);
+    const { error: deleteError } = await admin
+      .from("pending_workflow_jobs")
+      .delete()
+      .eq("github_job_id", jobId)
+      .eq("team_id", teamId);
+    if (deleteError) {
+      throw new HttpError(
+        500,
+        "PENDING_WORKFLOW_JOB_DELETE_FAILED",
+        "A reconciled workflow job could not be finalized.",
+      );
+    }
   }
 }
 
@@ -593,7 +838,7 @@ Deno.serve(async (request: Request) => {
         payload,
       );
     } else if (eventType === "workflow_job") {
-      await processWorkflowJob(admin, installation.team_id, payload);
+      await processWorkflowJob(admin, installation.team_id, deliveryId, payload);
     } else if (eventType === "push" || eventType === "pull_request") {
       if (
         !repositoryId ||
