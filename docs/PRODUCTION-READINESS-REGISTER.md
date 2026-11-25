@@ -44,14 +44,14 @@ This register distinguishes verified implementation from live deployment. A pass
 
 Never paste secret values into chat or commit them to Git.
 
-## Known implementation gaps from source review
+## Implementation changes on the current branch — CI verification pending
 
-- `skip_flaky` is stored as a preference but automatic flaky-run classification is not implemented.
-- User-facing Edge Functions do not yet have a durable shared rate-limiting mechanism. An in-memory per-instance counter is not an acceptable production substitute.
-- Request JSON is now streamed with a 16 KB limit; GitHub webhook bodies are streamed with a 2 MB limit. AI log ZIP extraction has per-file, file-count and aggregate expansion limits.
-- GitHub API GET/HEAD requests now use bounded timeout handling and up to two transient-error retries. Non-idempotent provider POST requests are not automatically retried to avoid duplicate side effects. Live provider behavior remains untested.
-- Workflow-job webhook processing expects its parent workflow run to have been synchronized first. Out-of-order delivery needs an explicit reconciliation/retry strategy.
-- Alert dispatch is at-least-once: if a provider accepts a message but the database status update fails, a later retry can send a duplicate. Provider idempotency or a reconciliation strategy is still needed.
+- User-authenticated Edge Function requests now use an atomic database-backed fixed-window limiter: 60 requests per user per function per minute. The key is a SHA-256 hash; the limiter fails closed if its database RPC is unavailable. GitHub webhooks remain protected by HMAC verification and delivery deduplication; the scheduler uses its independent shared secret.
+- Workflow-job events received before their parent run are stored as normalized fields (never raw webhook bodies) in `pending_workflow_jobs`. Parent-run synchronization reconciles those rows; the job handler rechecks the parent after inserting to close the event-order race. Unmatched pending jobs expire after seven days.
+- `workflow_run_attempts` retains each attempt and database triggers prevent stale attempt events from rolling back the latest run snapshot. With `skip_flaky` enabled, a failure followed by a successful latest attempt is classified as flaky and pending/pre-send failure alerts are suppressed. Failure alerts have a 10-minute grace period to allow an immediate rerun to arrive. Alerts already sent cannot be recalled.
+- Alert dispatch now separates the pre-send `processing` claim from provider `sending`. Stale `sending` rows become `delivery_unknown` and are never automatically retried, preventing duplicate Telegram sends when provider acceptance is ambiguous. Resend email requests also carry a stable idempotency key. Unknown outcomes require provider-side reconciliation before any manual resend.
+- Request JSON is streamed with a 16 KB limit; GitHub webhook bodies are streamed with a 2 MB limit. AI log ZIP extraction has per-file, file-count and aggregate expansion limits. GitHub API GET/HEAD requests use bounded timeout handling and up to two transient-error retries.
+- The new migration `20261125112000_reliable_event_delivery.sql` is in the branch and covered by Database Security CI, but has **not** been applied to the hosted Supabase project.
 - Current Playwright tests mock the Supabase Auth HTTP boundary. They do not verify live signup, confirmation email, OAuth, password recovery, team isolation, GitHub App, AI, or alert delivery.
 
 ## Migration provenance warning
