@@ -77,7 +77,7 @@ export function parseAnalysis(
 
   if (evidence.length === 0) {
     return {
-      category,
+      category: "unknown",
       cause:
         "Insufficient verifiable evidence in the workflow logs to identify a reliable root cause.",
       fix_steps: [],
@@ -87,11 +87,22 @@ export function parseAnalysis(
   }
 
   const hasUnverifiedEvidence = evidence.length !== proposedEvidence.length;
+  if (hasUnverifiedEvidence) {
+    return {
+      category: "unknown",
+      cause:
+        "Some cited evidence could not be verified against the workflow logs; the root cause remains uncertain.",
+      fix_steps: [],
+      evidence,
+      confidence: "low",
+    };
+  }
+
   return {
     category,
     cause,
     fix_steps: fixSteps,
     evidence,
-    confidence: hasUnverifiedEvidence ? "low" : confidence,
+    confidence,
   };
 }
