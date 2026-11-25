@@ -1,5 +1,6 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import {
+  fetchWithRetry,
   fetchWithTimeout,
   HttpError,
   readJsonObject,
@@ -51,4 +52,43 @@ Deno.test("fetchWithTimeout converts an upstream timeout to HTTP 504", async () 
   );
   assertEquals(error.status, 504);
   assertEquals(error.code, "UPSTREAM_TIMEOUT");
+});
+
+Deno.test("fetchWithRetry retries transient idempotent reads", async () => {
+  let calls = 0;
+  const transientFetch: typeof fetch = async () => {
+    calls += 1;
+    if (calls === 1) {
+      return new Response("temporarily unavailable", {
+        status: 503,
+        headers: { "retry-after": "0" },
+      });
+    }
+    return new Response("ok", { status: 200 });
+  };
+
+  const response = await fetchWithRetry(
+    "https://example.test",
+    {},
+    { timeoutMs: 100, maxRetries: 1 },
+    transientFetch,
+  );
+  assertEquals(response.status, 200);
+  assertEquals(calls, 2);
+});
+
+Deno.test("fetchWithRetry refuses to retry non-idempotent requests", async () => {
+  const unusedFetch: typeof fetch = () => {
+    throw new Error("Fetch must not run for a rejected method.");
+  };
+  const error = await assertRejects(
+    () => fetchWithRetry(
+      "https://example.test",
+      { method: "POST" },
+      { maxRetries: 1 },
+      unusedFetch,
+    ),
+    Error,
+  );
+  assertEquals(error.message, "Automatic retries are restricted to idempotent GET/HEAD requests.");
 });
