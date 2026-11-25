@@ -59,10 +59,12 @@ Deno.test("fetchWithRetry retries transient idempotent reads", async () => {
   const transientFetch: typeof fetch = () => {
     calls += 1;
     if (calls === 1) {
-      return Promise.resolve(new Response("temporarily unavailable", {
-        status: 503,
-        headers: { "retry-after": "0" },
-      }));
+      return Promise.resolve(
+        new Response("temporarily unavailable", {
+          status: 503,
+          headers: { "retry-after": "0" },
+        }),
+      );
     }
     return Promise.resolve(new Response("ok", { status: 200 }));
   };
@@ -82,13 +84,17 @@ Deno.test("fetchWithRetry refuses to retry non-idempotent requests", async () =>
     throw new Error("Fetch must not run for a rejected method.");
   };
   const error = await assertRejects(
-    () => fetchWithRetry(
-      "https://example.test",
-      { method: "POST" },
-      { maxRetries: 1 },
-      unusedFetch,
-    ),
+    () =>
+      fetchWithRetry(
+        "https://example.test",
+        { method: "POST" },
+        { maxRetries: 1 },
+        unusedFetch,
+      ),
     Error,
   );
-  assertEquals(error.message, "Automatic retries are restricted to idempotent GET/HEAD requests.");
+  assertEquals(
+    error.message,
+    "Automatic retries are restricted to idempotent GET/HEAD requests.",
+  );
 });
