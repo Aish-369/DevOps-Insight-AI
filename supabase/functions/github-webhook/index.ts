@@ -830,7 +830,12 @@ Deno.serve(async (request: Request) => {
         payload,
       );
     } else if (eventType === "workflow_job") {
-      await processWorkflowJob(admin, installation.team_id, deliveryId, payload);
+      await processWorkflowJob(
+        admin,
+        installation.team_id,
+        deliveryId,
+        payload,
+      );
     } else if (eventType === "push" || eventType === "pull_request") {
       if (
         !repositoryId ||
