@@ -47,10 +47,22 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/devops_insight_test
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261112100118_create_team_workspace_foundation.sql
-      - name: Apply the new security and monitoring migration
+      - name: Apply the security and monitoring migration
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/devops_insight_test
-        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124144452_secure_workspace_data_plane.sql
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261125111227_secure_workspace_data_plane.sql
+      - name: Apply foreign-key indexes
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/devops_insight_test
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261125111400_index_phase3_foreign_keys.sql
+      - name: Apply sensitive-column grants
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/devops_insight_test
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261125111523_restrict_sensitive_workspace_columns.sql
+      - name: Apply explicit client-deny policies
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/devops_insight_test
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261125111715_deny_client_access_to_internal_tables.sql
       - name: Verify least privilege, RLS isolation and owner trigger
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/devops_insight_test
