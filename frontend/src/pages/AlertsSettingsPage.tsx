@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bell, RefreshCw } from "lucide-react";
+import { Bell } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import "./PlatformPages.css";
 
@@ -73,7 +73,15 @@ export default function AlertsSettingsPage() {
     }
   }, [teamId]);
 
-  useEffect(() => { void loadData(); }, [loadData]);
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => {
+      if (active) void loadData();
+    });
+    return () => {
+      active = false;
+    };
+  }, [loadData]);
 
   async function requestVerification() {
     setSaving(true); setError(""); setNotice("");

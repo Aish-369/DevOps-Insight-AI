@@ -79,7 +79,15 @@ export default function IntegrationsPage() {
     }
   }, [teamId]);
 
-  useEffect(() => { void loadData(); }, [loadData]);
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => {
+      if (active) void loadData();
+    });
+    return () => {
+      active = false;
+    };
+  }, [loadData]);
 
   async function connectGithub() {
     if (!teamId) return;

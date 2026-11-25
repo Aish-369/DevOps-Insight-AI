@@ -105,7 +105,15 @@ export default function WorkflowRunsPage() {
     }
   }, [teamId]);
 
-  useEffect(() => { void loadData(); }, [loadData]);
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => {
+      if (active) void loadData();
+    });
+    return () => {
+      active = false;
+    };
+  }, [loadData]);
 
   async function analyze(runId: number) {
     setAnalyzingRunId(runId);
