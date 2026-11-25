@@ -25,7 +25,7 @@ function mockAdmin(
       filters.push([column, value]);
       return this;
     },
-    async maybeSingle() {
+    maybeSingle() {
       if (shouldError) return { data: null, error: new Error("query failed") };
       const matches = mapping !== null &&
         filters.every(([column, value]) =>
