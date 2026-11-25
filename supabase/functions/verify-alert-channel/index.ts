@@ -40,13 +40,13 @@ Deno.serve(async (request: Request) => {
     }
     await requireTeamRole(context, teamId);
 
-    const channelId = typeof body.channel_id === "string"
+    const verificationChannelId = typeof body.channel_id === "string"
       ? body.channel_id
       : "";
     const submittedCode = typeof body.code === "string" ? body.code.trim() : "";
 
-    if (channelId || submittedCode) {
-      if (!channelId || !/^\d{6}$/.test(submittedCode)) {
+    if (verificationChannelId || submittedCode) {
+      if (!verificationChannelId || !/^\d{6}$/.test(submittedCode)) {
         throw new HttpError(
           400,
           "INVALID_VERIFICATION_CODE",
@@ -59,7 +59,7 @@ Deno.serve(async (request: Request) => {
         .select(
           "id,team_id,channel_type,target,verified_at,verification_code_hash,verification_expires_at,verification_attempts",
         )
-        .eq("id", channelId)
+        .eq("id", verificationChannelId)
         .eq("team_id", teamId)
         .maybeSingle();
 
@@ -79,7 +79,7 @@ Deno.serve(async (request: Request) => {
             verification_code_hash: null,
             verification_expires_at: null,
           })
-          .eq("id", channelId);
+          .eq("id", verificationChannelId);
         throw new HttpError(
           410,
           "VERIFICATION_EXPIRED",
@@ -88,7 +88,7 @@ Deno.serve(async (request: Request) => {
       }
 
       const submittedHash = await sha256Hex(
-        [teamId, channelId, submittedCode].join(":"),
+        [teamId, verificationChannelId, submittedCode].join(":"),
       );
       const attempts = Number(channel.verification_attempts ?? 0);
       if (attempts >= 5) {
@@ -102,7 +102,7 @@ Deno.serve(async (request: Request) => {
         const { data: attemptUpdate, error: attemptError } = await context.admin
           .from("alert_channels")
           .update({ verification_attempts: attempts + 1 })
-          .eq("id", channelId)
+          .eq("id", verificationChannelId)
           .eq("team_id", teamId)
           .eq("verification_attempts", attempts)
           .select("id")
@@ -128,7 +128,7 @@ Deno.serve(async (request: Request) => {
           verification_expires_at: null,
           verification_attempts: 0,
         })
-        .eq("id", channelId)
+        .eq("id", verificationChannelId)
         .eq("team_id", teamId)
         .is("verified_at", null);
 
@@ -146,14 +146,14 @@ Deno.serve(async (request: Request) => {
         context.user.id,
         "alerts.channel.verified",
         {
-          channel_id: channelId,
+          channel_id: verificationChannelId,
           channel_type: channel.channel_type,
         },
       );
       return jsonResponse(request, {
         ok: true,
         verified: true,
-        channel_id: channelId,
+        channel_id: verificationChannelId,
       });
     }
 
