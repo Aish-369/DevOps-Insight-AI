@@ -9,7 +9,8 @@ BEGIN
     'github_installations','team_repositories','workflow_runs','workflow_jobs',
     'activity_events','webhook_events','failure_analyses','analysis_feedback',
     'alert_channels','alert_rules','alerts_sent','team_audit_events',
-    'github_installation_states','team_ai_usage'
+    'github_installation_states','team_ai_usage','workflow_run_attempts',
+    'pending_workflow_jobs'
   ]
   LOOP
     IF NOT EXISTS (
@@ -56,6 +57,31 @@ BEGIN
       AND column_name = 'attempt_count'
   ) THEN
     RAISE EXCEPTION 'alert delivery attempt counter is missing';
+  END IF;
+  IF has_table_privilege('anon', 'public.workflow_run_attempts', 'SELECT')
+     OR has_table_privilege('authenticated', 'public.workflow_run_attempts', 'SELECT')
+     OR has_table_privilege('anon', 'public.pending_workflow_jobs', 'SELECT')
+     OR has_table_privilege('authenticated', 'public.pending_workflow_jobs', 'SELECT') THEN
+    RAISE EXCEPTION 'client roles can read internal workflow reconciliation tables';
+  END IF;
+  IF has_table_privilege('anon', 'private.api_rate_limits', 'SELECT')
+     OR has_table_privilege('authenticated', 'private.api_rate_limits', 'SELECT') THEN
+    RAISE EXCEPTION 'client roles can read shared rate-limit buckets';
+  END IF;
+  IF has_function_privilege('anon', 'public.consume_api_rate_limit(text,integer,integer)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.consume_api_rate_limit(text,integer,integer)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'browser roles can execute the internal rate-limit function';
+  END IF;
+  IF NOT has_function_privilege('service_role', 'public.consume_api_rate_limit(text,integer,integer)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'service role cannot execute the shared rate-limit function';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.alerts_sent'::regclass
+      AND conname = 'alerts_sent_status_check'
+      AND pg_get_constraintdef(oid) LIKE '%delivery_unknown%'
+  ) THEN
+    RAISE EXCEPTION 'ambiguous provider-delivery state is not constrained';
   END IF;
   IF has_table_privilege('authenticated', 'public.github_installation_states', 'SELECT') THEN
     RAISE EXCEPTION 'authenticated unexpectedly has SELECT on github_installation_states';
@@ -173,8 +199,28 @@ BEGIN
   END IF;
 END
 $ai_quota$;
+  first_rate_claim boolean;
+  second_rate_claim boolean;
+  third_rate_claim boolean;
+  independent_rate_claim boolean;
+BEGIN
+  SELECT public.consume_api_rate_limit(repeat('a', 64), 2, 3600)
+    INTO first_rate_claim;
+  SELECT public.consume_api_rate_limit(repeat('a', 64), 2, 3600)
+    INTO second_rate_claim;
+  SELECT public.consume_api_rate_limit(repeat('a', 64), 2, 3600)
+    INTO third_rate_claim;
+  SELECT public.consume_api_rate_limit(repeat('b', 64), 2, 3600)
+    INTO independent_rate_claim;
+  IF first_rate_claim IS DISTINCT FROM true
+     OR second_rate_claim IS DISTINCT FROM true
+     OR third_rate_claim IS DISTINCT FROM false
+     OR independent_rate_claim IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'Shared rate-limit buckets did not enforce per-key limits';
+  END IF;
+END
+$rate_limit$;
 RESET ROLE;
-
 
 
 -- The owner invariant is enforced by a trigger even for service-role mutations.
@@ -213,6 +259,45 @@ INSERT INTO public.team_repositories(github_repo_id,team_id,installation_id,full
 VALUES (8001,'10000000-0000-0000-0000-000000000001',9001,'team-one/service');
 INSERT INTO public.workflow_runs(github_run_id,team_id,github_repo_id,workflow_name,run_number,status,conclusion)
 VALUES (7001,'10000000-0000-0000-0000-000000000001',8001,'CI',10,'completed','failure');
+
+-- Attempt history is durable and older webhook events cannot roll back the latest run.
+INSERT INTO public.workflow_run_attempts(
+  github_run_id, team_id, run_attempt, status, conclusion, github_updated_at
+) VALUES
+  (7001, '10000000-0000-0000-0000-000000000001', 1, 'completed', 'failure', now() - interval '2 minutes'),
+  (7001, '10000000-0000-0000-0000-000000000001', 2, 'completed', 'success', now());
+UPDATE public.workflow_run_attempts
+SET status = 'in_progress', conclusion = NULL,
+    github_updated_at = now() - interval '1 day'
+WHERE github_run_id = 7001 AND run_attempt = 2;
+UPDATE public.workflow_runs
+SET run_attempt = 2, status = 'completed', conclusion = 'success',
+    github_updated_at = now()
+WHERE github_run_id = 7001;
+UPDATE public.workflow_runs
+SET run_attempt = 1, status = 'completed', conclusion = 'failure',
+    github_updated_at = now() - interval '1 day'
+WHERE github_run_id = 7001;
+DO $attempt_history$
+BEGIN
+  IF (SELECT count(*) FROM public.workflow_run_attempts WHERE github_run_id = 7001) <> 2 THEN
+    RAISE EXCEPTION 'Workflow attempt history was not retained';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.workflow_run_attempts
+    WHERE github_run_id = 7001 AND run_attempt = 2
+      AND status = 'completed' AND conclusion = 'success'
+  ) THEN
+    RAISE EXCEPTION 'An older workflow event overwrote the latest attempt';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.workflow_runs
+    WHERE github_run_id = 7001 AND run_attempt = 2 AND conclusion = 'success'
+  ) THEN
+    RAISE EXCEPTION 'An older workflow event rolled back the latest run snapshot';
+  END IF;
+END
+$attempt_history$;
 
 -- User 1 is a member of Team One only: RLS must hide Team Two.
 SET LOCAL ROLE authenticated;
