@@ -391,7 +391,11 @@ Deno.serve(async (request: Request) => {
       Number.isFinite(processingStartedAt) &&
       nowMs - processingStartedAt < 5 * 60 * 1000;
     if (currentlyProcessing) {
-      return jsonResponse(request, { ok: true, duplicate: true, processing: true });
+      return jsonResponse(request, {
+        ok: true,
+        duplicate: true,
+        processing: true,
+      });
     }
 
     const currentAttempts = Number(existingDelivery.attempts ?? 0);
@@ -418,7 +422,11 @@ Deno.serve(async (request: Request) => {
       .select("delivery_id")
       .maybeSingle();
     if (retryError || !retryClaim) {
-      return jsonResponse(request, { ok: true, duplicate: true, processing: true });
+      return jsonResponse(request, {
+        ok: true,
+        duplicate: true,
+        processing: true,
+      });
     }
   } else if (deliveryError) {
     return jsonResponse(request, { error: "WEBHOOK_RECEIVE_FAILED" }, 500);

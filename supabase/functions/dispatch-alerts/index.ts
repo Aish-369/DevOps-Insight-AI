@@ -41,9 +41,14 @@ Deno.serve(async (request: Request) => {
 
     const { data: pending, error } = await context.admin
       .from("alerts_sent")
-      .select("id,team_id,channel_id,github_run_id,kind,dedupe_key,status,attempt_count")
+      .select(
+        "id,team_id,channel_id,github_run_id,kind,dedupe_key,status,attempt_count",
+      )
       .eq("team_id", teamId)
-      .or("status.eq.pending,and(status.eq.processing,claimed_at.lt." + new Date(Date.now() - 5 * 60 * 1000).toISOString() + ")")
+      .or(
+        "status.eq.pending,and(status.eq.processing,claimed_at.lt." +
+          new Date(Date.now() - 5 * 60 * 1000).toISOString() + ")",
+      )
       .order("created_at", { ascending: true })
       .limit(25);
 
