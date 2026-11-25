@@ -202,6 +202,7 @@ Deno.serve(async (request: Request) => {
       .select("github_repo_id,full_name,installation_id")
       .eq("team_id", teamId)
       .eq("github_repo_id", run.github_repo_id)
+      .eq("active", true)
       .maybeSingle();
 
     if (repoError || !repository) {
