@@ -32,6 +32,9 @@ function dueAlertFilter(now = Date.now()): string {
     "and(status.eq.failed,attempt_count.lt." + MAX_ATTEMPTS + ")",
     "and(status.eq.processing,claimed_at.lt." + staleBefore +
     ",attempt_count.lt." + MAX_ATTEMPTS + ")",
+    "and(status.eq.processing,claimed_at.lt." + staleBefore +
+    ",attempt_count.gte." + MAX_ATTEMPTS + ")",
+    "and(status.eq.sending,provider_started_at.lt." + staleBefore + ")",
   ].join(",");
 }
 
