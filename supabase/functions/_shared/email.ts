@@ -4,6 +4,7 @@ export async function sendEmail(
   to: string,
   subject: string,
   html: string,
+  idempotencyKey?: string,
 ): Promise<string> {
   const apiKey = Deno.env.get("RESEND_API_KEY")?.trim();
   const from = Deno.env.get("EMAIL_FROM")?.trim();
@@ -16,6 +17,7 @@ export async function sendEmail(
     headers: {
       authorization: `Bearer ${apiKey}`,
       "content-type": "application/json",
+      ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}),
     },
     body: JSON.stringify({ from, to: [to], subject, html }),
   }, 15_000);
