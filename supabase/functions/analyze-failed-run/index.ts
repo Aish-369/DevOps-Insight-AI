@@ -2,10 +2,10 @@ import { createInstallationToken } from "../_shared/github.ts";
 import { requireAuth, requireTeamRole, writeAudit } from "../_shared/auth.ts";
 import {
   assertAllowedOrigin,
+  fetchWithTimeout,
   handleError,
   HttpError,
   jsonResponse,
-  fetchWithTimeout,
   preflight,
   readJsonObject,
 } from "../_shared/http.ts";
