@@ -96,7 +96,7 @@ export function normalizeGithubPrivateKeyPem(pem: string): string {
 }
 
 import { importPKCS8, SignJWT } from "jose";
-import { HttpError } from "./http.ts";
+import { fetchWithTimeout, HttpError } from "./http.ts";
 
 const API_BASE = "https://api.github.com";
 const API_VERSION = "2022-11-28";
@@ -135,7 +135,7 @@ export async function githubAppRequest<T>(
   body?: Record<string, unknown>,
 ): Promise<T> {
   const appJwt = await createGithubAppJwt();
-  const response = await fetch(API_BASE + path, {
+  const response = await fetchWithTimeout(API_BASE + path, {
     method,
     headers: {
       authorization: "Bearer " + appJwt,
@@ -144,7 +144,7 @@ export async function githubAppRequest<T>(
       "x-github-api-version": API_VERSION,
     },
     body: body ? JSON.stringify(body) : undefined,
-  });
+  }, 15_000);
 
   if (!response.ok) {
     console.error("GitHub App API request failed", {
@@ -183,13 +183,13 @@ export async function githubInstallationRequest<T>(
   installationToken: string,
   path: string,
 ): Promise<{ data: T; nextPage: boolean }> {
-  const response = await fetch(API_BASE + path, {
+  const response = await fetchWithTimeout(API_BASE + path, {
     headers: {
       authorization: "Bearer " + installationToken,
       accept: "application/vnd.github+json",
       "x-github-api-version": API_VERSION,
     },
-  });
+  }, 15_000);
 
   if (!response.ok) {
     console.error("GitHub installation API request failed", {
