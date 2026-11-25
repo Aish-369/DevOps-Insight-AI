@@ -360,7 +360,9 @@ Deno.serve(async (request: Request) => {
 
   const installationId = numberAt(objectAt(payload, "installation"), "id");
   const repositoryId = numberAt(objectAt(payload, "repository"), "id");
-  const digest = await crypto.subtle.digest("SHA-256", rawBody);
+  const digestBuffer = new ArrayBuffer(rawBody.byteLength);
+  new Uint8Array(digestBuffer).set(rawBody);
+  const digest = await crypto.subtle.digest("SHA-256", digestBuffer);
   const payloadHash = Array.from(
     new Uint8Array(digest),
     (value) => value.toString(16).padStart(2, "0"),
