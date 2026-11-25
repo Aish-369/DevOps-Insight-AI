@@ -15,6 +15,8 @@ import { unzipSync } from "fflate";
 const MAX_LOG_ARCHIVE_BYTES = 20 * 1024 * 1024;
 const MAX_LOG_TEXT_CHARS = 120_000;
 const MAX_LOG_ENTRY_BYTES = 1_000_000;
+const MAX_LOG_ARCHIVE_FILES = 200;
+const MAX_LOG_TOTAL_UNCOMPRESSED_BYTES = 20 * 1024 * 1024;
 
 function requiredEnv(name: string): string {
   const value = Deno.env.get(name)?.trim();
@@ -79,12 +81,29 @@ async function fetchRunLogs(
   }
 
   let files: Record<string, Uint8Array>;
+  let archiveFileCount = 0;
+  let totalUncompressedBytes = 0;
   try {
     files = unzipSync(archive, {
-      filter: (file) =>
-        file.originalSize <= MAX_LOG_ENTRY_BYTES && /\.txt$/i.test(file.name),
+      filter: (file) => {
+        archiveFileCount += 1;
+        totalUncompressedBytes += file.originalSize;
+        if (
+          archiveFileCount > MAX_LOG_ARCHIVE_FILES ||
+          totalUncompressedBytes > MAX_LOG_TOTAL_UNCOMPRESSED_BYTES
+        ) {
+          throw new HttpError(
+            413,
+            "GITHUB_LOG_ARCHIVE_EXPANSION_LIMIT",
+            "The workflow log archive expands beyond the analysis safety limit.",
+          );
+        }
+        return file.originalSize <= MAX_LOG_ENTRY_BYTES &&
+          /\.txt$/i.test(file.name);
+      },
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
     throw new HttpError(
       502,
       "GITHUB_LOG_ARCHIVE_INVALID",
