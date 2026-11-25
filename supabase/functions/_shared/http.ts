@@ -203,7 +203,12 @@ export async function fetchWithRetry(
 
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     const response = await fetchWithTimeout(input, init, timeoutMs, fetchImpl);
-    const retryable = [429, 500, 502, 503, 504].includes(response.status);
+    const githubRateLimit403 = response.status === 403 && (
+      response.headers.has("retry-after") ||
+      response.headers.get("x-ratelimit-remaining") === "0"
+    );
+    const retryable = [429, 500, 502, 503, 504].includes(response.status) ||
+      githubRateLimit403;
     if (!retryable || attempt === maxRetries) return response;
 
     const retryAfter = response.headers.get("retry-after");
