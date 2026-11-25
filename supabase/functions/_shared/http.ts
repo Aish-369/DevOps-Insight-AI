@@ -154,6 +154,62 @@ export async function readRequestBytes(
   return result;
 }
 
+/** Read an upstream response body with a hard streaming byte limit. */
+export async function readResponseBytes(
+  response: Response,
+  maxBytes: number,
+  errorCode = "UPSTREAM_RESPONSE_TOO_LARGE",
+): Promise<Uint8Array> {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) {
+    throw new Error("The response byte limit must be a positive integer.");
+  }
+
+  const declaredLengthHeader = response.headers.get("content-length");
+  const declaredLength = declaredLengthHeader === null
+    ? Number.NaN
+    : Number(declaredLengthHeader);
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    await response.body?.cancel();
+    throw new HttpError(
+      413,
+      errorCode,
+      "The upstream response exceeds the configured size limit.",
+    );
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) return new Uint8Array();
+
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      totalBytes += chunk.value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel();
+        throw new HttpError(
+          413,
+          errorCode,
+          "The upstream response exceeds the configured size limit.",
+        );
+      }
+      chunks.push(chunk.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const result = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return result;
+}
+
 /**
  * Fetch an upstream service with a bounded lifetime. The timeout signal remains
  * attached to the response so a stalled response body is also aborted.
