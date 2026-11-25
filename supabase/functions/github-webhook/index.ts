@@ -28,13 +28,14 @@ function stringAt(value: unknown, key: string): string | null {
 }
 
 function branchMatches(pattern: string, branch: string): boolean {
-  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\function stringAt(value: unknown, key: string): string | null {
-  const raw = isObject(value) ? value[key] : undefined;
-  return typeof raw === "string" && raw.length > 0 ? raw : null;
-}");
-  return new RegExp("^" + escaped.replaceAll("*", ".*") + "$").test(branch);
+  const special = ".+?^$(){}|[]\\";
+  let regex = "^";
+  for (const character of pattern) {
+    if (character === "*") regex += ".*";
+    else regex += special.includes(character) ? "\\" + character : character;
+  }
+  return new RegExp(regex + "$").test(branch);
 }
-
 const ALLOWED_EVENTS = new Set([
   "installation",
   "installation_repositories",
