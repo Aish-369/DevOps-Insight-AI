@@ -1,5 +1,24 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  page.on("pageerror", (error) => {
+    console.error("[BROWSER_PAGE_ERROR]", error.stack ?? error.message);
+  });
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      console.error("[BROWSER_CONSOLE_ERROR]", message.text());
+    }
+  });
+  page.on("requestfailed", (request) => {
+    console.error("[BROWSER_REQUEST_FAILED]", request.method(), request.url(), request.failure()?.errorText ?? "unknown");
+  });
+  page.on("response", (response) => {
+    if (response.status() >= 400) {
+      console.error("[BROWSER_HTTP_ERROR]", response.status(), response.url());
+    }
+  });
+});
+
 test("an unauthenticated visitor is redirected from protected routes to sign in", async ({ page }) => {
   await page.goto("/dashboard");
 
