@@ -1,7 +1,7 @@
 # Phase 3 — Operations and deployment guide
 
 **Confirmed Supabase target:** `mtrmvvtobbbjusiteyvp`  
-**Current state (2026-11-25):** Database migrations are applied. No Edge Functions have been deployed yet. No paid Supabase development branch was created.
+**Current state (2026-11-25):** The five migrations listed below are applied. The new reliability migration in the current Git branch is not yet applied. No Edge Functions have been deployed yet. No paid Supabase development branch was created.
 
 ## 1. Database state — already applied
 
@@ -14,6 +14,9 @@ The target project's migration history is:
 - `20261125111715_deny_client_access_to_internal_tables`
 
 Do not re-run these migrations. The four incremental migrations were applied after a successful transaction/rollback validation. Workspace row counts for teams, members, invitations and projects were zero before and after. No database backup was created during this session; the migration set was additive/security-focused, and the existing workspace tables contained no rows at the time of application.
+
+The branch also contains `20261125112000_reliable_event_delivery.sql`. It adds shared API rate-limit buckets, workflow attempt history, normalized pending-job reconciliation, and explicit ambiguous alert-delivery states. It has **not** been applied to the hosted project. Apply it only as part of the separately approved deployment/migration step, after its Database Security CI run passes. Do not claim these new tables or states exist in the hosted database until that migration is applied and verified.
+
 
 The original source for the pre-existing workspace foundation migration was unavailable. Its repository SQL is a reconstruction from the live catalog, not recovered original source. Do not use that reconstructed baseline to overwrite an existing database.
 
@@ -61,6 +64,13 @@ Only set provider credentials for providers the product will actually use. Resen
 ## 5. Function deployment and verification
 
 The target currently has zero deployed Edge Functions. Deploy the version-controlled functions only after the required secrets and frontend origin are configured. The function config intentionally sets `verify_jwt = false`; every user-facing function performs its own Supabase user authentication and team-role checks, while the GitHub webhook validates the raw-body HMAC signature and the scheduler uses its independent secret. Do not change those checks or expose service credentials in the browser.
+
+### Reliability behavior to understand before operating
+
+- Authenticated Edge Function requests are limited to 60 requests per user/function per minute. A rate-limit database failure returns 503 (fail-closed); a limit breach returns 429. GitHub webhook requests use HMAC verification and delivery deduplication; scheduled dispatch uses the separate scheduler secret.
+- A workflow job arriving before its parent run is stored as normalized pending data and reconciled when the parent run arrives. Pending records expire after seven days; inspect the webhook event history if a job remains absent.
+- With `skip_flaky` enabled, a failed attempt followed by a successful latest retry is classified as flaky. Failure alerts wait 10 minutes before dispatch so an immediate rerun can suppress them. An alert already sent cannot be recalled.
+- Alert rows move from `processing` to `sending` immediately before contacting a provider. A stale `sending` row becomes `delivery_unknown`; it is deliberately excluded from automatic retries. Check provider delivery logs before deciding whether to resend. Do not blindly reset an unknown Telegram delivery to pending because Telegram does not provide a general idempotency key.
 
 After deployment, verify:
 - User-authenticated team/invitation/member operations with owner, admin and member accounts.
