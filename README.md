@@ -60,12 +60,13 @@ The frontend talks to Supabase using only a publishable/anon key. The service-ro
 
 **This branch contains the implemented code and isolated tests; it is not a live production deployment.**
 
-- The Supabase project inspected during development could not be conclusively mapped to the application because the frontend environment template is placeholder-only.
-- No migration has been applied to the connected Supabase project from this work.
-- No Edge Function has been deployed and no Auth provider, GitHub App, email, Telegram, AI or scheduler secret has been configured.
-- Sending invitations, alerts, GitHub webhooks and AI analysis therefore requires the setup in the Phase 3 operations guide.
-- The original SQL source for the already-applied workspace foundation migration was absent from the repository. The file 20261112100118_create_team_workspace_foundation.sql is a documented reconstruction from read-only catalog inspection. Review it against the original source before using it for a new database.
-- skip_flaky is currently a stored preference column; automatic flaky-run classification is not implemented in this branch.
+- The project owner confirmed Supabase project `mtrmvvtobbbjusiteyvp` as the target. It is currently active and healthy.
+- The pre-existing workspace foundation migration was already present. Four incremental Phase 3 migrations have since been applied and verified in the hosted project. Do not reapply them.
+- No Edge Function has been deployed. Auth redirect settings, GitHub App, email, Telegram, AI and scheduler secrets remain unconfigured; the production frontend URL is still unknown.
+- Invitations, GitHub webhooks, AI analysis and alert delivery cannot be considered live until the operations guide setup and end-to-end checks are completed.
+- The original SQL source for the already-applied workspace foundation migration was absent from the repository. The file `20261112100118_create_team_workspace_foundation.sql` is a documented reconstruction from read-only catalog inspection. It was not reapplied to the existing project. Compare it with the original source before using it to provision a new database.
+- `skip_flaky` is currently a stored preference; automatic flaky-run classification is not implemented.
+- On the Supabase Free plan, leaked-password protection is unavailable and its Security Advisor warning remains.
 
 ## Getting started — frontend
 
@@ -127,4 +128,4 @@ Work is organized into ordered review branches:
 2. Phase 2 — authentication lifecycle.
 3. Phase 3 — database security and platform backend.
 
-The Phase 3 branch is intended to target the Phase 2 branch. Review and merge the phases in order; do not merge Phase 3 directly to main ahead of its dependencies.
+The implementation is organized into ordered review branches. PR #9 (Phase 2) was merged into the Phase 1 branch, and PR #10 (Phase 3) was merged into the Phase 2 branch. PR #8 (Phase 1 → main) remains open. The current Phase 3 code tree has passing Frontend, Edge Functions and Database Security CI evidence on its PR head. The phase chain has not yet been merged into `main`; review the dependency chain and deployment configuration before any main-branch merge.
