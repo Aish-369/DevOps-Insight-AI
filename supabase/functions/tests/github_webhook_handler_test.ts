@@ -142,7 +142,6 @@ Deno.test("webhook handler acknowledges unsupported events without database acce
   assertEquals(await responseBody(response), { ok: true, ignored: true });
 });
 
-
 type MockFilter = { column: string; value: unknown };
 
 interface RepositoryMockConfig {
