@@ -44,7 +44,7 @@ This register distinguishes verified implementation from live deployment. A pass
 
 Never paste secret values into chat or commit them to Git.
 
-## Implementation changes on the current branch — CI verification pending
+## Implementation changes on the current branch — CI verified
 
 - User-authenticated Edge Function requests now use an atomic database-backed fixed-window limiter: 60 requests per user per function per minute. The key is a SHA-256 hash; the limiter fails closed if its database RPC is unavailable. GitHub webhooks remain protected by HMAC verification and delivery deduplication; the scheduler uses its independent shared secret.
 - Workflow-job events received before their parent run are stored as normalized fields (never raw webhook bodies) in `pending_workflow_jobs`. Parent-run synchronization reconciles those rows; the job handler rechecks the parent after inserting to close the event-order race. Unmatched pending jobs expire after seven days.
@@ -52,6 +52,7 @@ Never paste secret values into chat or commit them to Git.
 - Alert dispatch now separates the pre-send `processing` claim from provider `sending`. Stale `sending` rows become `delivery_unknown` and are never automatically retried, preventing duplicate Telegram sends when provider acceptance is ambiguous. Resend email requests also carry a stable idempotency key. Unknown outcomes require provider-side reconciliation before any manual resend.
 - Request JSON is streamed with a 16 KB limit; GitHub webhook bodies are streamed with a 2 MB limit. AI log ZIP extraction has per-file, file-count and aggregate expansion limits. GitHub API GET/HEAD requests use bounded timeout handling and up to two transient-error retries.
 - The new migration `20261125112000_reliable_event_delivery.sql` is in the branch and covered by Database Security CI, but has **not** been applied to the hosted Supabase project.
+- Final code verification on head `aedf255020b55d4e83fa779e7b4d0b359735bd6b`: [Frontend CI passed](https://github.com/Aish-369/DevOps-Insight-AI/actions/runs/45615109133), [Edge Functions CI passed](https://github.com/Aish-369/DevOps-Insight-AI/actions/runs/45615109141), and [Database Security CI passed](https://github.com/Aish-369/DevOps-Insight-AI/actions/runs/45615109191). The database run applied the pending migration only to its disposable PostgreSQL test database, not the hosted Supabase project.
 - Current Playwright tests mock the Supabase Auth HTTP boundary. They do not verify live signup, confirmation email, OAuth, password recovery, team isolation, GitHub App, AI, or alert delivery.
 
 ## Migration provenance warning
