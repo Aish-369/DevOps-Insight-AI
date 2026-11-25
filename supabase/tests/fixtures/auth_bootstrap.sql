@@ -16,7 +16,8 @@ $$;
 CREATE SCHEMA IF NOT EXISTS auth;
 CREATE TABLE IF NOT EXISTS auth.users (
   id uuid PRIMARY KEY,
-  email text UNIQUE
+  email text UNIQUE,
+  raw_user_meta_data jsonb NOT NULL DEFAULT '{}'::jsonb
 );
 CREATE OR REPLACE FUNCTION auth.uid()
 RETURNS uuid

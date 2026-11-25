@@ -89,6 +89,10 @@ BEGIN
   IF has_column_privilege('authenticated', 'public.alert_channels', 'verified_at', 'UPDATE') THEN
     RAISE EXCEPTION 'authenticated can modify alert_channels.verified_at';
   END IF;
+  IF has_function_privilege('anon', 'public.handle_new_user()', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.handle_new_user()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'browser roles can execute auth profile trigger function';
+  END IF;
   IF has_function_privilege('anon', 'private.is_team_member(uuid)', 'EXECUTE') THEN
     RAISE EXCEPTION 'anon can execute private.is_team_member';
   END IF;
@@ -123,14 +127,29 @@ BEGIN
 END
 $$;
 
-INSERT INTO auth.users(id, email) VALUES
-  ('00000000-0000-0000-0000-000000000001', 'owner-one@example.test'),
-  ('00000000-0000-0000-0000-000000000002', 'owner-two@example.test'),
-  ('00000000-0000-0000-0000-000000000003', 'member-one@example.test');
+INSERT INTO auth.users(id, email, raw_user_meta_data) VALUES
+  ('00000000-0000-0000-0000-000000000001', 'owner-one@example.test', '{"full_name":"Owner One"}'),
+  ('00000000-0000-0000-0000-000000000002', 'owner-two@example.test', '{"full_name":"Owner Two"}'),
+  ('00000000-0000-0000-0000-000000000003', 'member-one@example.test', '{"full_name":"Member One"}');
 
-INSERT INTO public.profiles(id, display_name) VALUES
-  ('00000000-0000-0000-0000-000000000001', 'Owner One'),
-  ('00000000-0000-0000-0000-000000000002', 'Owner Two');
+DO $profile_trigger$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = '00000000-0000-0000-0000-000000000001'
+      AND display_name = 'Owner One'
+  ) THEN
+    RAISE EXCEPTION 'auth.users profile creation trigger did not populate the owner profile';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = '00000000-0000-0000-0000-000000000003'
+      AND display_name = 'Member One'
+  ) THEN
+    RAISE EXCEPTION 'auth.users profile creation trigger did not populate the member profile';
+  END IF;
+END
+$profile_trigger$;
 
 INSERT INTO public.teams(id, name, owner_id) VALUES
   ('10000000-0000-0000-0000-000000000001', 'Team One', '00000000-0000-0000-0000-000000000001'),
