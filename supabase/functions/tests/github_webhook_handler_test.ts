@@ -150,6 +150,7 @@ interface RepositoryMockConfig {
   repositoryInstallationId: number;
   teamId: string;
   active: boolean;
+  duplicateStatus?: string;
 }
 
 class MockSupabaseQuery implements PromiseLike<{ data: unknown; error: null }> {
@@ -175,7 +176,16 @@ class MockSupabaseQuery implements PromiseLike<{ data: unknown; error: null }> {
     return this;
   }
 
-  update(_values: unknown): this {
+  update(values: unknown): this {
+    if (
+      this.table === "team_repositories" &&
+      typeof values === "object" &&
+      values !== null &&
+      "active" in values &&
+      values.active === false
+    ) {
+      this.config.active = false;
+    }
     return this;
   }
 
@@ -183,7 +193,15 @@ class MockSupabaseQuery implements PromiseLike<{ data: unknown; error: null }> {
     return this;
   }
 
-  insert(_values: unknown): Promise<{ error: null }> {
+  in(column: string, values: unknown[]): this {
+    this.filters.push({ column, value: values });
+    return this;
+  }
+
+  insert(_values: unknown): Promise<{ error: { code: string } | null }> {
+    if (this.table === "webhook_events" && this.config.duplicateStatus) {
+      return Promise.resolve({ error: { code: "23505" } });
+    }
     return Promise.resolve({ error: null });
   }
 
@@ -201,6 +219,21 @@ class MockSupabaseQuery implements PromiseLike<{ data: unknown; error: null }> {
           actual.column === filter.column && actual.value === filter.value
         )
       );
+
+    if (
+      this.table === "webhook_events" &&
+      this.config.duplicateStatus
+    ) {
+      return Promise.resolve({
+        data: {
+          status: this.config.duplicateStatus,
+          attempts: 1,
+          processing_started_at: null,
+          dead: false,
+        },
+        error: null,
+      });
+    }
 
     if (
       this.table === "github_installations" &&
@@ -354,5 +387,65 @@ Deno.test("workflow_job webhook rejects a repository mapped to another installat
     dependencies({ createAdminClient: () => mock.client }),
   );
   assertEquals(response.status, 500);
+  assertEquals(mock.writes.pendingJobs.length, 0);
+});
+
+
+Deno.test("processed duplicate webhook delivery is acknowledged without reprocessing", async () => {
+  const mock = mockAdmin({
+    installationId: 456,
+    repositoryId: 123,
+    repositoryInstallationId: 456,
+    teamId: "team-a",
+    active: true,
+    duplicateStatus: "processed",
+  });
+  const req = await request(
+    workflowJobPayload(456, 123),
+    "workflow_job",
+    "delivery-already-processed",
+  );
+  const response = await handleGithubWebhook(
+    req,
+    dependencies({ createAdminClient: () => mock.client }),
+  );
+  assertEquals(response.status, 200);
+  assertEquals(await responseBody(response), { ok: true, duplicate: true });
+  assertEquals(mock.writes.pendingJobs.length, 0);
+});
+
+Deno.test("repository removal deactivates mapping and blocks later workflow job events", async () => {
+  const mock = mockAdmin({
+    installationId: 456,
+    repositoryId: 123,
+    repositoryInstallationId: 456,
+    teamId: "team-a",
+    active: true,
+  });
+  const removalPayload = JSON.stringify({
+    installation: { id: 456 },
+    repositories_removed: [{ id: 123 }],
+  });
+  const removalRequest = await request(
+    removalPayload,
+    "installation_repositories",
+    "delivery-repository-removed",
+  );
+  const removalResponse = await handleGithubWebhook(
+    removalRequest,
+    dependencies({ createAdminClient: () => mock.client }),
+  );
+  assertEquals(removalResponse.status, 200);
+
+  const workflowRequest = await request(
+    workflowJobPayload(456, 123),
+    "workflow_job",
+    "delivery-job-after-repository-removal",
+  );
+  const workflowResponse = await handleGithubWebhook(
+    workflowRequest,
+    dependencies({ createAdminClient: () => mock.client }),
+  );
+  assertEquals(workflowResponse.status, 500);
   assertEquals(mock.writes.pendingJobs.length, 0);
 });
