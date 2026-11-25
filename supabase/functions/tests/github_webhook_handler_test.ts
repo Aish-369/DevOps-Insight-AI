@@ -53,7 +53,9 @@ async function request(
   });
 }
 
-async function responseBody(response: Response): Promise<Record<string, unknown>> {
+async function responseBody(
+  response: Response,
+): Promise<Record<string, unknown>> {
   return await response.json() as Record<string, unknown>;
 }
 
@@ -75,7 +77,9 @@ Deno.test("webhook handler rejects missing server configuration", async () => {
     dependencies({ getSecret: () => undefined }),
   );
   assertEquals(response.status, 503);
-  assertEquals(await responseBody(response), { error: "WEBHOOK_NOT_CONFIGURED" });
+  assertEquals(await responseBody(response), {
+    error: "WEBHOOK_NOT_CONFIGURED",
+  });
 });
 
 Deno.test("webhook handler rejects oversized request bodies", async () => {
@@ -115,7 +119,9 @@ Deno.test("webhook handler rejects missing delivery and event headers", async ()
   });
   const response = await handleGithubWebhook(req, dependencies());
   assertEquals(response.status, 400);
-  assertEquals(await responseBody(response), { error: "INVALID_WEBHOOK_HEADERS" });
+  assertEquals(await responseBody(response), {
+    error: "INVALID_WEBHOOK_HEADERS",
+  });
 });
 
 Deno.test("webhook handler rejects malformed JSON after signature verification", async () => {
@@ -126,7 +132,11 @@ Deno.test("webhook handler rejects malformed JSON after signature verification",
 });
 
 Deno.test("webhook handler acknowledges unsupported events without database access", async () => {
-  const req = await request("{}", "deployment_status", "delivery-unsupported-event");
+  const req = await request(
+    "{}",
+    "deployment_status",
+    "delivery-unsupported-event",
+  );
   const response = await handleGithubWebhook(req, dependencies());
   assertEquals(response.status, 200);
   assertEquals(await responseBody(response), { ok: true, ignored: true });
