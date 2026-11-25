@@ -219,7 +219,7 @@ export default function AlertsSettingsPage() {
           </section>
           <section className="platform-card">
             <h2>Notification delivery</h2>
-            <p>Dispatch queued alerts manually while a scheduler is not configured.</p>
+            <p>Dispatch queued alerts manually while a scheduler is not configured. If a delivery outcome is unknown, check the provider before attempting any manual resend.</p>
             <button type="button" onClick={() => void dispatchNow()} disabled={saving}><Bell size={16} /> Dispatch pending alerts</button>
           </section>
         </>
@@ -229,7 +229,7 @@ export default function AlertsSettingsPage() {
         {loading ? <p role="status">Loading alert history…</p> : alerts.length === 0 ? <p className="platform-muted">No alerts recorded for this workspace yet.</p> : alerts.map((alert) => (
           <div className="platform-list-row" key={alert.id}>
             <div><strong>{alert.kind} workflow alert</strong><p>Run #{alert.github_run_id} · {new Date(alert.created_at).toLocaleString()}</p></div>
-            <span className="platform-status platform-status-neutral">{alert.status}</span>
+            <span className="platform-status platform-status-neutral">{alert.status === "delivery_unknown" ? "Delivery unknown — check provider" : alert.status}</span>
           </div>
         ))}
       </section>
