@@ -35,9 +35,9 @@ BEGIN
        AND NEW.github_updated_at < OLD.github_updated_at
      ) THEN
     NEW := OLD;
-    NEW.is_flaky := OLD.is_flaky OR incoming_is_flaky;
+    NEW.is_flaky := OLD.is_flaky;
   ELSE
-    NEW.is_flaky := OLD.is_flaky OR incoming_is_flaky;
+    NEW.is_flaky := incoming_is_flaky;
   END IF;
   RETURN NEW;
 END;
@@ -125,7 +125,6 @@ AS $function$
 DECLARE
   v_now timestamptz := clock_timestamp();
   v_count integer;
-  v_window_expired boolean;
 BEGIN
   IF p_key_hash !~ '^[0-9a-f]{64}$'
      OR p_limit < 1 OR p_limit > 1000
