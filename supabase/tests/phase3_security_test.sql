@@ -199,6 +199,9 @@ BEGIN
   END IF;
 END
 $ai_quota$;
+
+DO $rate_limit$
+DECLARE
   first_rate_claim boolean;
   second_rate_claim boolean;
   third_rate_claim boolean;
