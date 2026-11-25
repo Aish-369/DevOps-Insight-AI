@@ -41,9 +41,11 @@ BEGIN
   IF NEW.run_attempt < OLD.run_attempt
      OR (
        NEW.run_attempt = OLD.run_attempt
-       AND NEW.github_updated_at IS NOT NULL
        AND OLD.github_updated_at IS NOT NULL
-       AND (NEW.github_updated_at IS NULL OR NEW.github_updated_at < OLD.github_updated_at)
+       AND (
+         NEW.github_updated_at IS NULL
+         OR NEW.github_updated_at < OLD.github_updated_at
+       )
      ) THEN
     NEW := OLD;
     NEW.is_flaky := OLD.is_flaky;
