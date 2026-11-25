@@ -1,127 +1,73 @@
 # Phase 3 — Operations and deployment guide
 
-## Current status
+**Confirmed Supabase target:** `mtrmvvtobbbjusiteyvp`  
+**Current state (2026-11-25):** Database migrations are applied. No Edge Functions have been deployed yet. No paid Supabase development branch was created.
 
-This guide describes the server implementation and the configuration still required to activate external providers. No live Supabase migration, Edge Function deployment, Auth setting, provider secret or production deployment was performed while preparing this branch.
+## 1. Database state — already applied
 
-The connected Supabase project inspected during development was healthy, but it could not be proven to be the project referenced by the application because the app environment was placeholder-only. Do not infer a production project from the connected-project name.
+The target project's migration history is:
 
-## 1. Verify the target Supabase project first
+- `20261112100118_create_team_workspace_foundation`
+- `20261125111227_secure_workspace_data_plane`
+- `20261125111400_index_phase3_foreign_keys`
+- `20261125111523_restrict_sensitive_workspace_columns`
+- `20261125111715_deny_client_access_to_internal_tables`
 
-Before deploying:
-1. Confirm the exact Supabase project reference and production owner with the project operator.
-2. Confirm whether migration 20261112100118_create_team_workspace_foundation is already recorded as applied.
-3. Recover the original SQL for that migration, if possible, and compare it with supabase/migrations/20261112100118_create_team_workspace_foundation.sql.
-4. Review the incremental migration 20261124144452_secure_workspace_data_plane.sql against the target schema.
-5. Test on an isolated development project or a database branch before considering production.
+Do not re-run these migrations. The four incremental migrations were applied after a successful transaction/rollback validation. Workspace row counts for teams, members, invitations and projects were zero before and after. No database backup was created during this session; the migration set was additive/security-focused, and the existing workspace tables contained no rows at the time of application.
 
-The baseline file is a reconstruction from read-only schema/catalog inspection, not the recovered original source. Its role is to make clean local/test databases reproducible while retaining the already-recorded migration version.
+The original source for the pre-existing workspace foundation migration was unavailable. Its repository SQL is a reconstruction from the live catalog, not recovered original source. Do not use that reconstructed baseline to overwrite an existing database.
 
-## 2. Supabase Auth configuration
+## 2. Supabase Auth settings
 
-Configure these URLs in the confirmed Supabase project's Auth URL settings:
+Configure the confirmed project's Auth URL settings after the frontend production origin is known:
+
 - Site URL: the deployed browser application's origin.
-- Redirect allow-list: the application's /auth/callback route.
-- Password recovery redirect: the application's /reset-password route.
-- GitHub OAuth callback/provider settings, only if GitHub OAuth login is enabled.
+- Redirect allow-list: the application's `/auth/callback` route.
+- Password minimum length: use at least 8 characters and enable the strongest character requirements available on the plan.
 
-Email confirmation and recovery delivery depend on the Supabase Auth provider and email configuration. They have not been tested against a real inbox from this branch.
+**Free-plan limitation:** Supabase's leaked-password protection (HaveIBeenPwned check) is Pro-and-above only. The Security Advisor warning will remain on Free; there is no free-plan workaround. See the [Supabase password security documentation](https://supabase.com/docs/guides/auth/password-security).
 
-## 3. Edge Function secrets
+## 3. Edge Function secrets — required before deployment
 
-Copy supabase/functions/.env.example to a local, untracked secrets file and populate values in the confirmed target environment. Use the provider's secret manager or the Supabase CLI secret mechanism; do not commit the local file.
+The code uses Supabase's automatically injected project URL and API keys. The current shared auth helper supports the current `SUPABASE_PUBLISHABLE_KEYS` and `SUPABASE_SECRET_KEYS` dictionaries, with legacy key fallbacks.
 
-Core Supabase:
-- SUPABASE_URL
-- SUPABASE_SERVICE_ROLE_KEY — server only, never VITE_
-- SUPABASE_PUBLISHABLE_KEYS (JSON object with a default key) or legacy SUPABASE_ANON_KEY
-- APP_BASE_URL — exact browser origin, with no trailing path
+Set the following project-level values in **Supabase Dashboard → Edge Functions → Secrets**. Do not paste secret values into chat or commit them to GitHub. Supabase's official guide: https://supabase.com/docs/guides/functions/secrets
 
-Security:
-- GITHUB_WEBHOOK_SECRET — must exactly match the GitHub App webhook secret
-- ALERT_VERIFICATION_PEPPER — long random HMAC key used to hash six-digit verification codes
-- ALERT_SCHEDULER_SECRET — at least 32 random characters; use the exact same value in the GitHub Actions repository secret
+| Name | Purpose |
+|---|---|
+| `APP_BASE_URL` | Exact HTTPS origin of the deployed frontend; used for CORS and invitation URLs |
+| `GITHUB_APP_ID` | GitHub App numeric ID |
+| `GITHUB_APP_SLUG` | GitHub App slug |
+| `GITHUB_APP_PRIVATE_KEY` | GitHub App private PEM key |
+| `GITHUB_WEBHOOK_SECRET` | Must match the GitHub App webhook secret |
+| `ALERT_VERIFICATION_PEPPER` | Long random HMAC pepper for alert-channel verification |
+| `ALERT_SCHEDULER_SECRET` | At least 32 random characters; also add the identical value as a GitHub Actions repository secret |
+| `RESEND_API_KEY` | Email provider credential |
+| `EMAIL_FROM` | Verified sender address/domain for Resend |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot credential (only if Telegram alerts are enabled) |
+| `AI_API_URL` | Full HTTPS OpenAI-compatible chat-completions endpoint |
+| `AI_API_KEY` | AI provider credential |
+| `AI_MODEL` | Model identifier supported by that endpoint |
 
-Providers:
-- GITHUB_APP_ID, GITHUB_APP_SLUG, GITHUB_APP_PRIVATE_KEY
-- RESEND_API_KEY, EMAIL_FROM
-- TELEGRAM_BOT_TOKEN
-- AI_API_URL, AI_API_KEY, AI_MODEL
+Only set provider credentials for providers the product will actually use. Resend/Telegram/AI providers may have their own free quotas and limits; confirm those separately. Supabase Edge Function secrets are not Vite variables.
 
-The GitHub private key can be provided as a PKCS#1 RSA PEM or PKCS#8 PEM. The server normalizes PKCS#1 to PKCS#8 before signing the short-lived GitHub App JWT.
+## 4. Frontend and scheduler configuration
 
-## 4. Database migration
+- Set the frontend's public Supabase URL and publishable key in its hosting environment.
+- Set `APP_BASE_URL` to the exact deployed frontend origin. Without it, browser requests from a non-loopback origin are rejected by CORS.
+- For the scheduled alert workflow, add GitHub repository secrets `SUPABASE_FUNCTIONS_URL` (the target project's `/functions/v1` base URL) and `ALERT_SCHEDULER_SECRET` (same value as the Supabase function secret).
+- Configure Supabase Auth Site URL and redirect allow-list to the actual deployed frontend URL.
 
-Apply migrations only after project identity and baseline drift are confirmed. The automated database CI is isolated PostgreSQL and does not deploy to hosted Supabase.
+## 5. Function deployment and verification
 
-The incremental migration:
-- moves RLS helpers to a non-exposed private schema;
-- removes broad anonymous/authenticated grants and tightens future default privileges;
-- preserves profile, team and membership data while removing a duplicate profile foreign key;
-- protects the final workspace owner;
-- adds team-scoped GitHub, workflow, webhook, AI, alert and audit tables;
-- grants application writes through trusted Edge Functions except for explicitly permitted narrow browser operations.
+The target currently has zero deployed Edge Functions. Deploy the version-controlled functions only after the required secrets and frontend origin are configured. The function config intentionally sets `verify_jwt = false`; every user-facing function performs its own Supabase user authentication and team-role checks, while the GitHub webhook validates the raw-body HMAC signature and the scheduler uses its independent secret. Do not change those checks or expose service credentials in the browser.
 
-Take a database backup and perform a reviewed development migration before production. Do not run a remote push from a developer workstation without the project operator's explicit approval.
+After deployment, verify:
+- User-authenticated team/invitation/member operations with owner, admin and member accounts.
+- GitHub App installation, repository sync and webhook signature rejection/acceptance using a non-production repository.
+- Alert-channel verification and email/Telegram delivery only for configured providers.
+- AI analysis and daily quota enforcement only after configuring an approved AI endpoint.
+- Scheduler authentication with a valid and invalid secret.
+- Auth signup, email confirmation, password recovery and redirect allow-list with a controlled test inbox.
 
-## 5. GitHub App setup
-
-Create/configure a GitHub App with only the repository permissions needed by this product:
-- Metadata: read
-- Actions: read (workflow runs/jobs and logs)
-- Contents: read only if required by a later diagnostics expansion; the current log analysis reads Actions logs.
-
-Subscribe to webhook events:
-- installation
-- installation_repositories
-- workflow_run
-- workflow_job
-- push
-- pull_request
-
-Set the webhook URL to:
-SUPABASE_URL/functions/v1/github-webhook
-
-Set the App's post-installation setup URL to:
-APP_BASE_URL/integrations/github/callback
-
-Store the App ID, slug, downloaded private key and webhook secret only in Edge Function secrets. Verify the event subscription and permissions using a non-production test repository first.
-
-## 6. Email and Telegram
-
-Resend must be configured with a verified sender domain/address before invitation and email alerts can be delivered. Telegram delivery requires a Bot API token and a chat ID that has initiated the bot conversation. Alert channels remain inactive until their six-digit verification code is confirmed.
-
-The verification code is short-lived (10 minutes), stored as an HMAC digest using ALERT_VERIFICATION_PEPPER, and limited to five incorrect attempts.
-
-## 7. AI provider and data handling
-
-AI_API_URL must be a full HTTPS OpenAI-compatible chat-completions URL (for example, a private provider endpoint ending in /chat/completions). AI_MODEL selects the configured model.
-
-Workflow logs may contain proprietary source paths, deployment information or personal data. The implementation bounds archive/entry sizes and redacts common token patterns, but regex redaction is not a guarantee that every secret or personal detail is removed. Review data retention and provider terms before enabling external AI analysis; a self-hosted/private endpoint is preferable for sensitive repositories.
-
-AI output is not a guaranteed root-cause diagnosis and must be checked against the original GitHub run and log evidence.
-
-## 8. Scheduled notifications
-
-The repository contains .github/workflows/scheduled-alert-dispatch.yml, which requests due alert deliveries every five minutes. To activate it:
-1. Configure Edge Function secret ALERT_SCHEDULER_SECRET.
-2. Add GitHub repository secret SUPABASE_FUNCTIONS_URL, set to the confirmed project's functions base URL ending in /functions/v1.
-3. Add GitHub repository secret ALERT_SCHEDULER_SECRET with the identical value used by the Edge Function.
-4. Merge the reviewed scheduler workflow to the repository's default branch. Scheduled GitHub Actions events run from the default branch.
-5. Trigger workflow_dispatch in a non-production test and verify the returned workspace_count, sent and failed totals.
-
-The scheduler endpoint has no browser token bypass: it requires a separate high-entropy scheduler secret and uses a service-role client server-side. The normal manual endpoint still requires a verified Supabase user and owner/admin membership.
-
-## 9. Post-deployment verification
-
-Run, in order:
-- Auth signup, confirmation, password recovery and expiry tests with a controlled test inbox.
-- Owner/admin/member workspace access tests using two isolated teams.
-- Invitation create, wrong-email rejection, expiry, revoke and one-time acceptance.
-- GitHub App install, repository add/remove event reconciliation, webhook signature rejection and duplicate delivery replay.
-- Workflow run/job ingestion and cross-team repository isolation.
-- AI analysis with a controlled failure log, redaction fixture and daily quota boundary.
-- Email/Telegram destination verification and duplicate alert delivery checks.
-- Scheduled dispatch in a test environment.
-
-Record the target project reference, migration versions, function deployment versions, provider configuration date, test identities and any remaining limitations before signing off production.
+Do not mark production readiness until these live integration checks pass and the final GitHub Actions runs are green.
