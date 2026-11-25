@@ -51,9 +51,36 @@ function getPublishableKey(): string {
   );
 }
 
+function getSecretKey(): string {
+  const secretKeys = Deno.env.get("SUPABASE_SECRET_KEYS");
+  if (secretKeys) {
+    try {
+      const parsed: unknown = JSON.parse(secretKeys);
+      if (typeof parsed === "object" && parsed !== null && "default" in parsed) {
+        const key = (parsed as Record<string, unknown>).default;
+        if (typeof key === "string" && key.length > 0) return key;
+      }
+    } catch {
+      throw new HttpError(
+        503,
+        "SUPABASE_SECRET_KEY_CONFIGURATION_INVALID",
+        "Supabase server key configuration is invalid.",
+      );
+    }
+  }
+
+  const legacyKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
+  if (legacyKey) return legacyKey;
+  throw new HttpError(
+    503,
+    "SUPABASE_SECRET_KEY_MISSING",
+    "Supabase server key is not configured.",
+  );
+}
+
 export function createAdminClient(): SupabaseClient {
   const url = requiredEnv("SUPABASE_URL");
-  const serviceRoleKey = requiredEnv("SUPABASE_SERVICE_ROLE_KEY");
+  const serviceRoleKey = getSecretKey();
   return createClient(url, serviceRoleKey, {
     auth: {
       persistSession: false,
