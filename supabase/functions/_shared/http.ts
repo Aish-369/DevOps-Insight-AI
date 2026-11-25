@@ -182,6 +182,48 @@ export async function fetchWithTimeout(
   }
 }
 
+export async function fetchWithRetry(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  options: { timeoutMs?: number; maxRetries?: number } = {},
+  fetchImpl: typeof fetch = fetch,
+): Promise<Response> {
+  const method = (init.method ?? "GET").toUpperCase();
+  if (method !== "GET" && method !== "HEAD") {
+    throw new Error("Automatic retries are restricted to idempotent GET/HEAD requests.");
+  }
+
+  const timeoutMs = options.timeoutMs ?? 15_000;
+  const maxRetries = options.maxRetries ?? 2;
+  if (!Number.isSafeInteger(maxRetries) || maxRetries < 0 || maxRetries > 3) {
+    throw new Error("The retry count must be between zero and three.");
+  }
+
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    const response = await fetchWithTimeout(input, init, timeoutMs, fetchImpl);
+    const retryable = [429, 500, 502, 503, 504].includes(response.status);
+    if (!retryable || attempt === maxRetries) return response;
+
+    const retryAfter = response.headers.get("retry-after");
+    const retryAfterSeconds = retryAfter === null ? Number.NaN : Number(retryAfter);
+    const retryAfterDate = retryAfter === null ? Number.NaN : Date.parse(retryAfter);
+    const delayMs = Number.isFinite(retryAfterSeconds)
+      ? retryAfterSeconds * 1_000
+      : Number.isFinite(retryAfterDate)
+      ? Math.max(0, retryAfterDate - Date.now())
+      : 250 * (2 ** attempt);
+
+    // Do not violate a provider's longer Retry-After window inside a short-lived function.
+    if (delayMs > 2_000) return response;
+    await response.body?.cancel();
+    if (delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  throw new Error("Unreachable retry state.");
+}
+
 export async function readJsonObject(
   request: Request,
 ): Promise<Record<string, unknown>> {
