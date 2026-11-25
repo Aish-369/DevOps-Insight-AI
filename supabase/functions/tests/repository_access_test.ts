@@ -15,8 +15,10 @@ function mockAdmin(
   shouldError = false,
 ): SupabaseClient {
   const filters: Array<[string, unknown]> = [];
+  let selectedColumns = "";
   const query = {
-    select() {
+    select(columns: string) {
+      selectedColumns = columns;
       return this;
     },
     eq(column: string, value: unknown) {
@@ -29,7 +31,14 @@ function mockAdmin(
         filters.every(([column, value]) =>
           mapping[column as keyof Mapping] === value
         );
-      return { data: matches ? mapping : null, error: null };
+      if (!matches) return { data: null, error: null };
+      const projected = Object.fromEntries(
+        selectedColumns.split(",").map((column) => [
+          column,
+          mapping[column.trim() as keyof Mapping],
+        ]),
+      );
+      return { data: projected, error: null };
     },
   };
   return {
@@ -61,8 +70,6 @@ Deno.test("active repository mapping is accepted for its team and installation",
     github_repo_id: 123,
     installation_id: 456,
     full_name: "acme/service",
-    team_id: "team-a",
-    active: true,
   });
 });
 
