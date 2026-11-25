@@ -98,3 +98,28 @@ Deno.test("fetchWithRetry refuses to retry non-idempotent requests", async () =>
     "Automatic retries are restricted to idempotent GET/HEAD requests.",
   );
 });
+
+Deno.test("fetchWithRetry retries GitHub primary rate-limit 403 responses", async () => {
+  let calls = 0;
+  const rateLimitedFetch: typeof fetch = () => {
+    calls += 1;
+    if (calls === 1) {
+      return Promise.resolve(
+        new Response("rate limited", {
+          status: 403,
+          headers: { "x-ratelimit-remaining": "0", "retry-after": "0" },
+        }),
+      );
+    }
+    return Promise.resolve(new Response("ok", { status: 200 }));
+  };
+
+  const response = await fetchWithRetry(
+    "https://api.github.com",
+    {},
+    { timeoutMs: 100, maxRetries: 1 },
+    rateLimitedFetch,
+  );
+  assertEquals(response.status, 200);
+  assertEquals(calls, 2);
+});
