@@ -1,6 +1,7 @@
 import { createAdminClient } from "../_shared/auth.ts";
 import { HttpError, jsonResponse, readRequestBytes } from "../_shared/http.ts";
 import { verifyGithubWebhookSignature } from "../_shared/webhook-security.ts";
+import { isFlakyWorkflowAttempts } from "../_shared/workflow-attempts.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type JsonObject = Record<string, unknown>;
@@ -242,17 +243,7 @@ async function reconcileFlakyRun(
     );
   }
 
-  const latest = attempts?.[attempts.length - 1];
-  const hasEarlierFailure = Boolean(
-    latest && attempts?.some((attempt) =>
-      attempt.run_attempt < latest.run_attempt &&
-      attempt.conclusion === "failure"
-    ),
-  );
-  const isFlaky = Boolean(
-    latest && latest.status === "completed" &&
-      latest.conclusion === "success" && hasEarlierFailure
-  );
+  const isFlaky = isFlakyWorkflowAttempts(attempts ?? []);
 
   const { error: runError } = await admin
     .from("workflow_runs")
