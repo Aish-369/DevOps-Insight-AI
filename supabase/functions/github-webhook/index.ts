@@ -56,6 +56,7 @@ async function repositoryBelongsToTeam(
     .select("github_repo_id")
     .eq("team_id", teamId)
     .eq("github_repo_id", repositoryId)
+    .eq("active", true)
     .maybeSingle();
   return !error && Boolean(data);
 }
@@ -390,6 +391,7 @@ async function processWorkflowRun(
 async function processWorkflowJob(
   admin: AdminClient,
   teamId: string,
+  repositoryId: number,
   deliveryId: string,
   payload: JsonObject,
 ): Promise<void> {
@@ -860,9 +862,24 @@ Deno.serve(async (request: Request) => {
         payload,
       );
     } else if (eventType === "workflow_job") {
+      if (
+        !repositoryId ||
+        !(await repositoryBelongsToTeam(
+          admin,
+          repositoryId,
+          installation.team_id,
+        ))
+      ) {
+        throw new HttpError(
+          409,
+          "REPOSITORY_NOT_MAPPED",
+          "Repository mapping is not available yet.",
+        );
+      }
       await processWorkflowJob(
         admin,
         installation.team_id,
+        repositoryId,
         deliveryId,
         payload,
       );
