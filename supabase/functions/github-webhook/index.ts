@@ -1,5 +1,5 @@
 import { createAdminClient } from "../_shared/auth.ts";
-import { HttpError, jsonResponse } from "../_shared/http.ts";
+import { HttpError, jsonResponse, readRequestBytes } from "../_shared/http.ts";
 import { verifyGithubWebhookSignature } from "../_shared/webhook-security.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -306,9 +306,14 @@ Deno.serve(async (request: Request) => {
     return jsonResponse(request, { error: "WEBHOOK_NOT_CONFIGURED" }, 503);
   }
 
-  const rawBody = new Uint8Array(await request.arrayBuffer());
-  if (rawBody.length > 2_000_000) {
-    return jsonResponse(request, { error: "PAYLOAD_TOO_LARGE" }, 413);
+  let rawBody: Uint8Array;
+  try {
+    rawBody = await readRequestBytes(request, 2_000_000);
+  } catch (error) {
+    if (error instanceof HttpError && error.status === 413) {
+      return jsonResponse(request, { error: "PAYLOAD_TOO_LARGE" }, 413);
+    }
+    return jsonResponse(request, { error: "WEBHOOK_BODY_READ_FAILED" }, 400);
   }
 
   const signatureOk = await verifyGithubWebhookSignature(
