@@ -56,7 +56,9 @@ function getSecretKey(): string {
   if (secretKeys) {
     try {
       const parsed: unknown = JSON.parse(secretKeys);
-      if (typeof parsed === "object" && parsed !== null && "default" in parsed) {
+      if (
+        typeof parsed === "object" && parsed !== null && "default" in parsed
+      ) {
         const key = (parsed as Record<string, unknown>).default;
         if (typeof key === "string" && key.length > 0) return key;
       }
