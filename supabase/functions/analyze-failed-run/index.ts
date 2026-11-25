@@ -277,14 +277,25 @@ Deno.serve(async (request: Request) => {
       });
     }
 
-    const { data: quotaClaimed, error: quotaError } = await context.admin.rpc("claim_team_ai_analysis", {
-      p_team_id: teamId,
-    });
+    const { data: quotaClaimed, error: quotaError } = await context.admin.rpc(
+      "claim_team_ai_analysis",
+      {
+        p_team_id: teamId,
+      },
+    );
     if (quotaError) {
-      throw new HttpError(500, "AI_USAGE_CLAIM_FAILED", "The team's AI analysis allowance could not be reserved.");
+      throw new HttpError(
+        500,
+        "AI_USAGE_CLAIM_FAILED",
+        "The team's AI analysis allowance could not be reserved.",
+      );
     }
     if (quotaClaimed !== true) {
-      throw new HttpError(429, "AI_DAILY_CAP_REACHED", "This team has reached its daily AI analysis limit.");
+      throw new HttpError(
+        429,
+        "AI_DAILY_CAP_REACHED",
+        "This team has reached its daily AI analysis limit.",
+      );
     }
 
     const endpoint = new URL(apiUrl);

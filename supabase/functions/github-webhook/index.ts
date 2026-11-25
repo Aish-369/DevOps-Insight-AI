@@ -367,15 +367,26 @@ Deno.serve(async (request: Request) => {
       .eq("delivery_id", deliveryId)
       .maybeSingle();
     if (lookupError || !existingDelivery) {
-      return jsonResponse(request, { error: "WEBHOOK_DUPLICATE_LOOKUP_FAILED" }, 500);
+      return jsonResponse(
+        request,
+        { error: "WEBHOOK_DUPLICATE_LOOKUP_FAILED" },
+        500,
+      );
     }
-    if (existingDelivery.status === "processed" || existingDelivery.status === "unmatched") {
+    if (
+      existingDelivery.status === "processed" ||
+      existingDelivery.status === "unmatched"
+    ) {
       return jsonResponse(request, { ok: true, duplicate: true });
     }
     deliveryAttempt = Number(existingDelivery.attempts ?? 0) + 1;
     const { data: retryClaim, error: retryError } = await admin
       .from("webhook_events")
-      .update({ status: "received", attempts: deliveryAttempt, last_error: null })
+      .update({
+        status: "received",
+        attempts: deliveryAttempt,
+        last_error: null,
+      })
       .eq("delivery_id", deliveryId)
       .in("status", ["failed", "received"])
       .select("delivery_id")

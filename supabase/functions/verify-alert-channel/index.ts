@@ -194,7 +194,9 @@ Deno.serve(async (request: Request) => {
 
     const code = randomNumericCode(6);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-    const normalizedTarget = channelType === "email" ? target.toLowerCase() : target;
+    const normalizedTarget = channelType === "email"
+      ? target.toLowerCase()
+      : target;
 
     const { data: existingChannel, error: existingError } = await context.admin
       .from("alert_channels")
@@ -204,17 +206,29 @@ Deno.serve(async (request: Request) => {
       .eq("target", normalizedTarget)
       .maybeSingle();
     if (existingError) {
-      throw new HttpError(500, "CHANNEL_LOOKUP_FAILED", "The alert destination could not be checked.");
+      throw new HttpError(
+        500,
+        "CHANNEL_LOOKUP_FAILED",
+        "The alert destination could not be checked.",
+      );
     }
     if (existingChannel?.verified_at) {
-      throw new HttpError(409, "CHANNEL_ALREADY_VERIFIED", "This alert destination is already verified.");
+      throw new HttpError(
+        409,
+        "CHANNEL_ALREADY_VERIFIED",
+        "This alert destination is already verified.",
+      );
     }
     if (
       existingChannel?.verification_expires_at &&
       Date.parse(existingChannel.verification_expires_at) > Date.now() &&
       Number(existingChannel.verification_attempts ?? 0) < 5
     ) {
-      throw new HttpError(409, "CHANNEL_VERIFICATION_PENDING", "A verification code is already active for this destination.");
+      throw new HttpError(
+        409,
+        "CHANNEL_VERIFICATION_PENDING",
+        "A verification code is already active for this destination.",
+      );
     }
 
     let channelId = existingChannel?.id as string | undefined;
@@ -230,9 +244,17 @@ Deno.serve(async (request: Request) => {
         .eq("id", channelId)
         .eq("team_id", teamId)
         .is("verified_at", null);
-      if (resetError) throw new HttpError(500, "CHANNEL_RENEW_FAILED", "A new verification request could not be created.");
+      if (resetError) {
+        throw new HttpError(
+          500,
+          "CHANNEL_RENEW_FAILED",
+          "A new verification request could not be created.",
+        );
+      }
     } else {
-      const { data: channel, error: insertError } = await context.admin.from("alert_channels")
+      const { data: channel, error: insertError } = await context.admin.from(
+        "alert_channels",
+      )
         .insert({
           team_id: teamId,
           channel_type: channelType,
@@ -248,9 +270,17 @@ Deno.serve(async (request: Request) => {
 
       if (insertError || !channel) {
         if (insertError?.code === "23505") {
-          throw new HttpError(409, "CHANNEL_ALREADY_EXISTS", "This alert destination has already been added to the team.");
+          throw new HttpError(
+            409,
+            "CHANNEL_ALREADY_EXISTS",
+            "This alert destination has already been added to the team.",
+          );
         }
-        throw new HttpError(500, "CHANNEL_CREATE_FAILED", "The alert channel could not be created.");
+        throw new HttpError(
+          500,
+          "CHANNEL_CREATE_FAILED",
+          "The alert channel could not be created.",
+        );
       }
       channelId = channel.id;
       createdNewChannel = true;
@@ -262,8 +292,15 @@ Deno.serve(async (request: Request) => {
       .eq("id", channelId)
       .eq("team_id", teamId);
     if (hashError) {
-      if (createdNewChannel) await context.admin.from("alert_channels").delete().eq("id", channelId).eq("team_id", teamId);
-      throw new HttpError(500, "CHANNEL_CREATE_FAILED", "The alert channel could not be created.");
+      if (createdNewChannel) {
+        await context.admin.from("alert_channels").delete().eq("id", channelId)
+          .eq("team_id", teamId);
+      }
+      throw new HttpError(
+        500,
+        "CHANNEL_CREATE_FAILED",
+        "The alert channel could not be created.",
+      );
     }
 
     try {
@@ -283,7 +320,8 @@ Deno.serve(async (request: Request) => {
       }
     } catch {
       if (createdNewChannel) {
-        await context.admin.from("alert_channels").delete().eq("id", channelId).eq("team_id", teamId);
+        await context.admin.from("alert_channels").delete().eq("id", channelId)
+          .eq("team_id", teamId);
       } else {
         await context.admin.from("alert_channels").update({
           verification_code_hash: null,
