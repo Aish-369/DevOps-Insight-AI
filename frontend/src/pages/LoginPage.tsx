@@ -1,9 +1,10 @@
 
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 // Import icons supported by lucide-react.
 import { Eye, EyeOff, ArrowRight } from "lucide-react";
 import { getErrorMessage } from "../lib/errorMessage";
+import { getSafeInternalPath } from "../lib/getSafeInternalPath";
 import { supabase } from "../lib/supabase";
 
 export default function LoginPage() {
@@ -16,6 +17,8 @@ export default function LoginPage() {
   const [error, setError] = useState("");
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextPath = getSafeInternalPath(searchParams.get("next"), window.location.origin);
 
   // Sign in with the user's Supabase account.
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
@@ -29,7 +32,7 @@ export default function LoginPage() {
         password,
       });
       if (loginError) throw loginError;
-      navigate("/dashboard", { replace: true });
+      navigate(nextPath, { replace: true });
     } catch (loginError: unknown) {
       setError(getErrorMessage(loginError, "Unable to sign in. Please try again."));
     } finally {
@@ -45,7 +48,7 @@ export default function LoginPage() {
     try {
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "github",
-        options: { redirectTo: `${window.location.origin}/dashboard` },
+        options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}` },
       });
       if (oauthError) throw oauthError;
     } catch (oauthError: unknown) {
@@ -165,6 +168,9 @@ export default function LoginPage() {
               </button>
             </div>
 
+            <p className="forgot-password-row">
+              <Link className="forgot-password-link" to="/forgot-password">Forgot password?</Link>
+            </p>
             {error && <p className="login-error" role="alert">{error}</p>}
 
             <button type="submit" className="sign-in-button" disabled={loading || oauthLoading}>

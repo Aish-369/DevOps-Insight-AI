@@ -3,10 +3,25 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getErrorMessage } from "../lib/errorMessage";
 import { supabase } from "../lib/supabase";
-
-// Import the matching signup CSS file.
 import "../styles/SignupPage.css";
 
+function isDuplicateSignupError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+
+  const code =
+    "code" in error && typeof error.code === "string" ? error.code : "";
+  const message =
+    "message" in error && typeof error.message === "string"
+      ? error.message.toLowerCase()
+      : "";
+
+  return (
+    code === "user_already_exists" ||
+    code === "email_exists" ||
+    message.includes("already registered") ||
+    message.includes("already exists")
+  );
+}
 export default function SignupPage() {
   const navigate = useNavigate();
 
@@ -29,8 +44,8 @@ export default function SignupPage() {
     setSuccess("");
 
     // Validate the password.
-    if (password.length < 8) {
-      setError("Password must contain at least 8 characters.");
+    if (password.length < 12) {
+      setError("Password must contain at least 12 characters.");
       return;
     }
 
@@ -51,6 +66,7 @@ export default function SignupPage() {
           data: {
             full_name: name.trim(),
           },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 
@@ -62,11 +78,15 @@ export default function SignupPage() {
       } else {
         // Email verification may be enabled in Supabase.
         setSuccess(
-          "Account created! Please check your email for verification."
+          "If this address can be registered, verification instructions will be sent. Check your inbox and spam folder."
         );
       }
     } catch (signupRequestError: unknown) {
-      setError(getErrorMessage(signupRequestError, "Unable to create your account. Please try again."));
+      setError(
+        isDuplicateSignupError(signupRequestError)
+          ? "Unable to create an account with those details. If you already have an account, sign in or reset your password."
+          : getErrorMessage(signupRequestError, "Unable to create your account. Please try again."),
+      );
     } finally {
       setLoading(false);
     }
@@ -129,9 +149,9 @@ export default function SignupPage() {
               id="signup-password"
               className="signup-input"
               type="password"
-              placeholder="Minimum 8 characters"
+              placeholder="Minimum 12 characters"
               autoComplete="new-password"
-              minLength={8}
+              minLength={12}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               required

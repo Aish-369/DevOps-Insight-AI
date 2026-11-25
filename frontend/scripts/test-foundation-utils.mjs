@@ -15,6 +15,7 @@ const { validateSupabasePublishableKey } = await importTs("../src/lib/validateSu
 const { validateSupabaseUrl } = await importTs("../src/lib/validateSupabaseUrl.ts");
 const { getErrorMessage } = await importTs("../src/lib/errorMessage.ts");
 const { isAuthSessionMissingError } = await importTs("../src/lib/isAuthSessionMissingError.ts");
+const { getSafeInternalPath } = await importTs("../src/lib/getSafeInternalPath.ts");
 
 assert.equal(validateSupabasePublishableKey("sb_publishable_example_public_key"), "sb_publishable_example_public_key");
 const jwt = (role) => `header.${Buffer.from(JSON.stringify({ role })).toString("base64url")}.signature`;
@@ -36,6 +37,12 @@ assert.equal(getErrorMessage({ code: "E_UNKNOWN" }, "fallback"), "fallback");
 assert.equal(isAuthSessionMissingError(Object.assign(new Error("Auth session missing!"), { name: "AuthSessionMissingError" })), true);
 assert.equal(isAuthSessionMissingError(new Error("Network failure")), false);
 assert.equal(isAuthSessionMissingError({ name: "AuthSessionMissingError" }), false);
+assert.equal(getSafeInternalPath("/dashboard", "https://app.example"), "/dashboard");
+assert.equal(getSafeInternalPath("/settings/account?tab=security", "https://app.example"), "/settings/account?tab=security");
+assert.equal(getSafeInternalPath("//evil.example/path", "https://app.example"), "/dashboard");
+assert.equal(getSafeInternalPath("https://evil.example/path", "https://app.example"), "/dashboard");
+assert.equal(getSafeInternalPath("/unknown-route", "https://app.example"), "/dashboard");
+assert.equal(getSafeInternalPath("/teams", "https://app.example", "/login"), "/teams");
 assert.equal(isPatchedViteVersion("8.3.7"), true);
 assert.equal(isPatchedViteVersion("8.3.8"), true);
 assert.equal(isPatchedViteVersion("8.3.8+build.1"), true);
@@ -43,4 +50,4 @@ assert.equal(isPatchedViteVersion("8.3.6"), false);
 assert.equal(isPatchedViteVersion("8.3.7-beta.1"), false);
 assert.equal(isPatchedViteVersion("8.3.8-rc.0"), false);
 assert.equal(isPatchedViteVersion("not-a-version"), false);
-console.log("Foundation utility tests passed (22 assertions).");
+console.log("Foundation utility tests passed (28 assertions).");
