@@ -284,7 +284,7 @@ async function reconcileFlakyRun(
     .eq("team_id", teamId)
     .eq("github_run_id", runId)
     .eq("kind", "failure")
-    .in("status", ["pending", "processing"]);
+    .in("status", ["pending", "processing", "failed"]);
   if (skipError) {
     throw new HttpError(
       500,
