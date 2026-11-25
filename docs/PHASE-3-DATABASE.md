@@ -16,6 +16,14 @@ The hosted project reports these exact migration versions:
 
 The repository migration filenames are aligned with the hosted migration versions. Do not reapply these migrations manually.
 
+The current branch additionally contains `20261125112000_reliable_event_delivery.sql`. This is a **pending, unapplied migration**, not part of the hosted migration history above. It adds:
+- private, service-role-only API rate-limit buckets and an atomic `consume_api_rate_limit` function;
+- RLS-protected workflow-attempt history and pending normalized workflow-job records;
+- latest-attempt guards against stale webhook updates;
+- alert availability timestamps and `sending` / `delivery_unknown` states to prevent blind retries after ambiguous provider outcomes.
+
+The updated Database Security CI applies this migration to its disposable PostgreSQL test database and exercises the new grants, rate-limit behavior, attempt-history ordering and RLS. Do not apply it to the hosted project until CI passes and the owner separately approves the migration/deployment step.
+
 ## Baseline caveat
 
 The original source for the already-applied workspace foundation migration was not available in the repository. The file `20261112100118_create_team_workspace_foundation.sql` is a documented reconstruction from read-only catalog inspection. It was not reapplied to the hosted project. Compare it with the original source if it is recovered before using it to provision a different database.
@@ -42,7 +50,7 @@ The original source for the already-applied workspace foundation migration was n
 
 ## CI status
 
-Database Security CI now applies the baseline plus all four incremental migrations before running the SQL integration test. See the latest GitHub Actions run for the final result; do not treat an in-progress run as passed.
+Database Security CI now applies the baseline plus the four hosted incremental migrations and the new branch-only reliability migration before running the SQL integration test. The hosted project has not yet received the new migration. See the latest GitHub Actions run for the final result; do not treat an in-progress run as passed.
 
 ## Production readiness boundary
 
