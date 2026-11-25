@@ -122,7 +122,6 @@ export default function AlertsSettingsPage() {
       const ruleValues = {
         branches,
         notify_recovered: notifyRecovered,
-        skip_flaky: false,
         daily_ai_cap: dailyCap,
         updated_at: new Date().toISOString(),
       };
