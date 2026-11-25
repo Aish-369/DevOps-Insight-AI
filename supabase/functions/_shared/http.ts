@@ -190,7 +190,9 @@ export async function fetchWithRetry(
 ): Promise<Response> {
   const method = (init.method ?? "GET").toUpperCase();
   if (method !== "GET" && method !== "HEAD") {
-    throw new Error("Automatic retries are restricted to idempotent GET/HEAD requests.");
+    throw new Error(
+      "Automatic retries are restricted to idempotent GET/HEAD requests.",
+    );
   }
 
   const timeoutMs = options.timeoutMs ?? 15_000;
@@ -205,8 +207,12 @@ export async function fetchWithRetry(
     if (!retryable || attempt === maxRetries) return response;
 
     const retryAfter = response.headers.get("retry-after");
-    const retryAfterSeconds = retryAfter === null ? Number.NaN : Number(retryAfter);
-    const retryAfterDate = retryAfter === null ? Number.NaN : Date.parse(retryAfter);
+    const retryAfterSeconds = retryAfter === null
+      ? Number.NaN
+      : Number(retryAfter);
+    const retryAfterDate = retryAfter === null
+      ? Number.NaN
+      : Date.parse(retryAfter);
     const delayMs = Number.isFinite(retryAfterSeconds)
       ? retryAfterSeconds * 1_000
       : Number.isFinite(retryAfterDate)
