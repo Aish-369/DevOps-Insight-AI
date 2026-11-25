@@ -249,14 +249,14 @@ async function reconcileFlakyRun(
       attempt.conclusion === "failure"
     ),
   );
-  if (
-    !latest || latest.status !== "completed" ||
-    latest.conclusion !== "success" || !hasEarlierFailure
-  ) return;
+  const isFlaky = Boolean(
+    latest && latest.status === "completed" &&
+      latest.conclusion === "success" && hasEarlierFailure
+  );
 
   const { error: runError } = await admin
     .from("workflow_runs")
-    .update({ is_flaky: true })
+    .update({ is_flaky: isFlaky })
     .eq("team_id", teamId)
     .eq("github_run_id", runId);
   if (runError) {
@@ -266,6 +266,7 @@ async function reconcileFlakyRun(
       "Workflow retry classification could not be saved.",
     );
   }
+  if (!isFlaky) return;
 
   const { data: rules, error: ruleError } = await admin
     .from("alert_rules")
