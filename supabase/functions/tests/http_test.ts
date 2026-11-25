@@ -56,15 +56,15 @@ Deno.test("fetchWithTimeout converts an upstream timeout to HTTP 504", async () 
 
 Deno.test("fetchWithRetry retries transient idempotent reads", async () => {
   let calls = 0;
-  const transientFetch: typeof fetch = async () => {
+  const transientFetch: typeof fetch = () => {
     calls += 1;
     if (calls === 1) {
-      return new Response("temporarily unavailable", {
+      return Promise.resolve(new Response("temporarily unavailable", {
         status: 503,
         headers: { "retry-after": "0" },
-      });
+      }));
     }
-    return new Response("ok", { status: 200 });
+    return Promise.resolve(new Response("ok", { status: 200 }));
   };
 
   const response = await fetchWithRetry(
