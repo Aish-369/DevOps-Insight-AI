@@ -61,11 +61,11 @@ The frontend talks to Supabase using only a publishable/anon key. The service-ro
 **This branch contains the implemented code and isolated tests; it is not a live production deployment.**
 
 - The project owner confirmed Supabase project `mtrmvvtobbbjusiteyvp` as the target. It is currently active and healthy.
-- The pre-existing workspace foundation migration was already present. Four incremental Phase 3 migrations have since been applied and verified in the hosted project. Do not reapply them.
+- The pre-existing workspace foundation migration and six incremental migrations are applied and verified in the hosted project. Do not reapply them.
 - No Edge Function has been deployed. Auth redirect settings, GitHub App, email, Telegram, AI and scheduler secrets remain unconfigured; the production frontend URL is still unknown.
 - Invitations, GitHub webhooks, AI analysis and alert delivery cannot be considered live until the operations guide setup and end-to-end checks are completed.
 - The original SQL source for the already-applied workspace foundation migration was absent from the repository. The file `20261112100118_create_team_workspace_foundation.sql` is a documented reconstruction from read-only catalog inspection. It was not reapplied to the existing project. Compare it with the original source before using it to provision a new database.
-- The current branch implements `skip_flaky` using durable workflow-attempt history, delayed failure alerts and suppression of unsent alerts after a successful retry. This code is not live until the pending reliability migration and Edge Functions are separately deployed.
+- The reliability migration is now applied to the hosted database, including durable workflow-attempt history, pending-job reconciliation, shared rate-limit storage and safe alert-delivery states. The Edge Functions are still not deployed, so these behaviors are not yet live.
 - On the Supabase Free plan, leaked-password protection is unavailable and its Security Advisor warning remains.
 
 ## Getting started — frontend
@@ -113,7 +113,7 @@ Edge Functions:
     deno task fmt:check
     deno task test
 
-Database CI runs PostgreSQL 17.11 in an isolated GitHub Actions service container. It creates test-only Supabase Auth primitives, applies the reconstructed workspace baseline, the four Phase 3 migrations already present on the hosted project, and the branch-only reliability migration. It tests RLS/privileges, sensitive-column access, foreign-key indexes, cross-team isolation, owner invariants, cascade behavior, atomic AI quota, shared rate-limit behavior, workflow-attempt ordering and delivery-state constraints. It does not connect to or modify the hosted Supabase project.
+Database CI runs PostgreSQL 17.11 in an isolated GitHub Actions service container. It creates test-only Supabase Auth primitives and applies the reconstructed workspace baseline plus all six incremental migrations. It tests RLS/privileges, sensitive-column access, foreign-key indexes, cross-team isolation, owner invariants, cascade behavior, atomic AI quota, shared rate-limit behavior, workflow-attempt ordering and delivery-state constraints. It does not connect to or modify the hosted Supabase project.
 
 ## Supabase and provider setup
 
