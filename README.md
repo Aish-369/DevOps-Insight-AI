@@ -1,194 +1,130 @@
 <div align="center">
 
-# 🚀 DevOps Insight AI
+# DevOps Insight AI
 
-### A smarter workspace for repository visibility and CI/CD monitoring
+### Team workspaces, GitHub CI monitoring, failure analysis and delivery alerts
 
-**An evolving SaaS project for teams and agencies that manage software delivery across multiple repositories.**
+**A React + Supabase application that connects GitHub App installations to team workspaces and turns GitHub Actions events into searchable workflow history and reviewable failure insights.**
 
-[![React](https://img.shields.io/badge/React-Frontend-149ECA?logo=react&logoColor=white)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-Type%20Safety-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-Build%20Tool-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
-[![Supabase](https://img.shields.io/badge/Supabase-Authentication-3FCF8E?logo=supabase&logoColor=white)](https://supabase.com/)
-[![Status](https://img.shields.io/badge/Status-Actively%20Building-F5A623)](#project-status)
-
-**[Features](#-features) · [Tech Stack](#-tech-stack) · [Getting Started](#-getting-started) · [Roadmap](#-product-roadmap)**
+[![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-8.3.8-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
+[![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20Edge%20Functions-3FCF8E?logo=supabase&logoColor=white)](https://supabase.com/)
 
 </div>
 
 ---
 
-## ✨ The Vision
+## What is implemented in this branch
 
-Managing multiple GitHub repositories and CI/CD workflows can quickly become difficult, especially for agencies working with several clients. **DevOps Insight AI** aims to bring repository activity, pipeline status, and actionable insights into one clean, centralized workspace.
+### Authentication and workspaces
+- Email/password sign-up, sign-in, sign-out, password recovery and reset flows, protected routes, and Supabase Auth callback handling.
+- Team workspaces with owner/admin/member roles.
+- Team invitations with single-use random tokens, hashed token storage, seven-day expiry, verified-email matching, revoke support, and server-side acceptance.
+- Member role management and removal. The database prevents removal/demotion of the final workspace owner.
 
-> **One workspace. Clearer delivery insights. Less context switching.**
+### GitHub integration and monitoring
+- GitHub App installation flow bound to an authenticated workspace admin through a short-lived one-time state token.
+- Installation metadata and repository sync using short-lived GitHub installation tokens.
+- Signed GitHub webhook endpoint. It verifies the raw request body with HMAC-SHA256, rejects duplicate delivery IDs, records only a payload digest (not the raw payload), and reconciles installation, repository, workflow-run, job, push and pull-request events.
+- Team-scoped workflow history and links to the corresponding GitHub Actions run.
 
-## 🧩 Features
+### AI failure analysis
+- Authenticated team members can request analysis of completed unsuccessful workflow runs.
+- Logs are size-bounded and common credential patterns are redacted before they are sent to the configured OpenAI-compatible chat-completions endpoint.
+- Results are stored with evidence, proposed next steps, model/prompt version and a confidence label.
+- Daily usage is reserved by an atomic PostgreSQL function and capped per team.
+- AI output is an assistive hypothesis. It does not apply code changes automatically and must be reviewed against the original logs.
 
-### ✅ Built so far
+### Alerts
+- Email and Telegram destinations require a verification code before they can receive alerts.
+- Alert rules support branch filters and recovery notifications.
+- Delivery records use deduplication keys, atomic processing claims, bounded retries and a manual dispatch action.
+- A five-minute GitHub Actions scheduler is included. It only activates after the required repository secrets and Supabase Edge Function secret have been configured and the workflow is present on the default branch.
 
-- **Login and signup pages** with responsive, pastel-inspired UI
-- **Supabase authentication** using email and password
-- **GitHub OAuth sign-in integration** in the authentication flow (requires Supabase/provider configuration)
-- **Protected dashboard route** for signed-in users
-- **Dashboard overview** with repository, pipeline, alert, and team metric placeholders
-- **Account-aware welcome message** and sign-out functionality
-- **Client-side form validation** and user feedback messages
+## Architecture
 
-> **Note:** Dashboard metrics currently display placeholders (`0`). Repository data, pipeline events, and alerts are **not yet connected to live services**.
-
-### 🔜 Planned capabilities
-
-- Connect and manage GitHub repositories
-- Track CI/CD pipeline runs and failure trends
-- Surface actionable failure insights with AI assistance
-- Configure alerts and notifications
-- Support multiple teams, clients, and workspaces
-- Add usage analytics and reporting
-
-## 🛠️ Tech Stack
-
-| Layer | Technology | Purpose |
+| Layer | Technology | Responsibility |
 |---|---|---|
-| Frontend | React + TypeScript | Component-based, type-safe UI |
-| Build tooling | Vite | Fast development and production builds |
-| Styling | Tailwind CSS + custom CSS | Responsive layouts and polished UI |
-| Navigation | React Router | Client-side routing and protected pages |
-| Authentication | Supabase Auth | User signup, login, and sessions |
-| Icons | Lucide React | Consistent interface icons |
-| Backend *(planned)* | Python + FastAPI | APIs and service integrations |
-| Database *(planned)* | PostgreSQL | Application and monitoring data |
-| Integrations *(planned)* | GitHub APIs / webhooks | Repository and workflow events |
+| Browser | React 19, TypeScript, Vite 8 | Authentication UI, workspaces, integrations, workflow history, alert settings |
+| Data/auth | Supabase Auth + PostgreSQL | User identity, team membership, RLS, event/analysis/alert persistence |
+| Server | Supabase Edge Functions (Deno 2) | Invitations, GitHub App, webhook verification, AI analysis, alert delivery |
+| GitHub | GitHub App + webhooks | Repository access, workflow events, logs |
+| Email | Resend | Invitation and verified alert delivery |
+| Telegram | Telegram Bot API | Verified chat delivery |
+| AI | Configurable OpenAI-compatible endpoint | Evidence-based CI log analysis |
 
-## 🖥️ Current App Flow
+The frontend talks to Supabase using only a publishable/anon key. The service-role key and all provider secrets remain in Edge Function/server configuration and are never Vite variables.
 
-```mermaid
-flowchart LR
-    A[Visitor] --> B{Authenticated?}
-    B -->|No| C[Login / Signup]
-    C --> D[Supabase Auth]
-    D -->|Valid session| E[Protected Dashboard]
-    B -->|Yes| E
-    E --> F[Overview & Empty States]
-    E --> G[Sign Out]
-    G --> C
-```
+## Important deployment status
 
-## 📁 Project Structure
+**This branch contains the implemented code and isolated tests; it is not a live production deployment.**
 
-```text
-DevOps-Insight-AI/
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   │   └── auth/
-│   │   │       └── ProtectedRoute.tsx
-│   │   ├── lib/
-│   │   │   └── supabase.ts
-│   │   ├── pages/
-│   │   │   ├── LoginPage.tsx
-│   │   │   ├── SignupPage.tsx
-│   │   │   └── DashboardPage.tsx
-│   │   ├── styles/
-│   │   │   ├── SignupPage.css
-│   │   │   └── DashboardPage.css
-│   │   ├── App.tsx
-│   │   └── main.tsx
-│   └── package.json
-├── .gitignore
-└── README.md
-```
+- The Supabase project inspected during development could not be conclusively mapped to the application because the frontend environment template is placeholder-only.
+- No migration has been applied to the connected Supabase project from this work.
+- No Edge Function has been deployed and no Auth provider, GitHub App, email, Telegram, AI or scheduler secret has been configured.
+- Sending invitations, alerts, GitHub webhooks and AI analysis therefore requires the setup in the Phase 3 operations guide.
+- The original SQL source for the already-applied workspace foundation migration was absent from the repository. The file 20261112100118_create_team_workspace_foundation.sql is a documented reconstruction from read-only catalog inspection. Review it against the original source before using it for a new database.
+- skip_flaky is currently a stored preference column; automatic flaky-run classification is not implemented in this branch.
 
-*Structure reflects the current frontend work. Additional services and folders will be introduced as the project grows.*
+## Getting started — frontend
 
-## ⚡ Getting Started
+Prerequisites: Node.js 22.16.0 and npm.
 
-### Prerequisites
+    git clone https://github.com/Aish-369/DevOps-Insight-AI.git
+    cd DevOps-Insight-AI/frontend
+    npm ci
 
-- [Node.js](https://nodejs.org/) and npm
-- A [Supabase](https://supabase.com/) project
-- Git
+Copy frontend/.env.example to frontend/.env.local and set:
 
-### 1. Clone the repository
+    VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+    VITE_SUPABASE_PUBLISHABLE_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
 
-```bash
-git clone https://github.com/Aish-369/DevOps-Insight-AI.git
-cd DevOps-Insight-AI/frontend
-```
+Use a Supabase publishable key or legacy anon key. Never put service_role, a secret key, GitHub private keys, provider tokens or webhook secrets in a VITE_ variable.
 
-### 2. Install dependencies
+Start the app:
 
-```bash
-npm install
-```
+    npm run dev
 
-### 3. Configure environment variables
+Build it:
 
-Create .env.local:
+    npm run build
 
-```dotenv
-VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_key
-```
+## Tests
 
-The frontend's Supabase client should read these variables. Configure your authentication provider and redirect URLs in the Supabase dashboard if using GitHub OAuth.
+Frontend:
 
-> 🔐 **Security:** Never commit `.env.local`, secret keys, or Supabase service-role keys. Frontend variables are exposed in the browser, so use only the publishable/anon key and enforce authorization with appropriate Supabase policies.
+    cd frontend
+    npm ci
+    npm test
+    npm run lint
+    npm run typecheck
+    npm run build
+    npx playwright install chromium
+    npm run test:e2e
 
-### 4. Start the app
+Edge Functions:
 
-```bash
-npm run dev
-```
+    cd supabase/functions
+    deno install --frozen
+    deno task check
+    deno task lint
+    deno task fmt:check
+    deno task test
 
-Open the local URL printed by Vite.
+Database CI runs PostgreSQL 17.11 in an isolated GitHub Actions service container. It creates test-only Supabase Auth primitives, applies the reconstructed workspace baseline and all four incremental migrations, then tests RLS/privileges, sensitive-column access, foreign-key indexes, cross-team isolation, owner invariants, cascade behavior and atomic AI quota. It does not connect to or modify the hosted Supabase project.
 
-In the current development configuration, the app runs at:
-http://localhost:5175
+## Supabase and provider setup
 
+Follow docs/PHASE-3-OPERATIONS.md for project verification, migration review, Auth redirect configuration, Edge Function secrets, GitHub App permissions/webhooks, alert providers and scheduler setup.
 
-### 5. Build for production
+Required Edge Function environment variables are listed in supabase/functions/.env.example. That file contains placeholders only. Do not copy real credentials into Git.
 
-```bash
-npm run build
-```
+## Repository workflow
 
-## 🧭 Product Roadmap
+Work is organized into ordered review branches:
+1. Phase 1 — foundation and code quality.
+2. Phase 2 — authentication lifecycle.
+3. Phase 3 — database security and platform backend.
 
-- [x] Initialize React + TypeScript frontend
-- [x] Build login and signup UI
-- [x] Integrate Supabase email/password authentication
-- [x] Add protected dashboard route
-- [x] Create responsive dashboard layout
-- [ ] Connect GitHub repositories and retrieve real data
-- [ ] Build pipeline monitoring and event history
-- [ ] Develop FastAPI backend and persistence layer
-- [ ] Add AI-assisted pipeline failure insights
-- [ ] Introduce alerts, client workspaces, and team permissions
-- [ ] Add tests, production deployment, and observability
-
-## 📌 Project Status
-
-**🚧 Active development — frontend foundation stage.**
-
-The authentication flow and initial dashboard UI are in place. Monitoring, AI analysis, and multi-client features describe the **product direction**, not functionality already available today.
-
-## 👩‍💻 About the Developer
-
-Built by **Aishwarya Pawar**, a Computer Science graduate exploring full-stack development, developer tools, and practical SaaS engineering.
-
-- **GitHub:** [@Aish-369](https://github.com/Aish-369)
-- **LinkedIn:** [Aishwarya Pawar](https://www.linkedin.com/in/aishwarya-pawar-018166315/)
-
-I’m building this project in public to learn by shipping real features, improving the architecture step by step, and documenting the journey.
-
----
-
-<div align="center">
-
-**⭐ Follow the project to see DevOps Insight AI evolve!**
-
-*Built with curiosity, consistency, and a focus on real-world engineering.*
-
-</div>
+The Phase 3 branch is intended to target the Phase 2 branch. Review and merge the phases in order; do not merge Phase 3 directly to main ahead of its dependencies.

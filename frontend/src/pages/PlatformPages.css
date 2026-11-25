@@ -1,0 +1,80 @@
+.platform-page {
+  min-height: 100vh;
+  padding: 36px 20px 64px;
+  background: #f7f8fc;
+  color: #252940;
+}
+.platform-wide { max-width: 1120px; margin: 0 auto; }
+.platform-card {
+  max-width: 720px;
+  margin: 0 auto 18px;
+  padding: 24px;
+  border: 1px solid #e8eaf1;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(35,42,65,.04);
+}
+.platform-wide .platform-card { max-width: none; }
+.platform-header {
+  max-width: 1120px;
+  margin: 0 auto 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+.platform-header h1, .platform-card h1 {
+  margin: 4px 0 10px;
+  color: #252940;
+  font-size: 28px;
+  font-weight: 800;
+}
+.platform-card h2 { display:flex; align-items:center; gap:8px; margin:0 0 16px; font-size:17px; font-weight:800; }
+.platform-header p:not(.platform-eyebrow), .platform-card p { color:#7e8598; font-size:13px; line-height:1.7; }
+.platform-eyebrow { margin:0; color:#8172d7; font-size:10px; font-weight:850; letter-spacing:1.7px; }
+.platform-page label { display:grid; gap:7px; margin:8px 0; color:#555b70; font-size:12px; font-weight:700; }
+.platform-page input, .platform-page select {
+  width:100%; min-height:42px; padding:10px 12px; border:1px solid #e2e5ef;
+  border-radius:10px; background:#fbfbfe; color:#30344a; font:inherit; font-size:13px;
+}
+.platform-page button {
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  min-height:40px; padding:9px 14px; border:1px solid transparent; border-radius:10px;
+  background:#7061d1; color:#fff; font-size:12px; font-weight:750; cursor:pointer;
+}
+.platform-page button:disabled { opacity:.6; cursor:wait; }
+.platform-page button.platform-secondary { border-color:#e2e5ef; background:#fff; color:#555b70; }
+.platform-actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
+.platform-error { color:#b44b4b!important; font-size:12px; }
+.platform-success { color:#2d8154!important; font-size:12px; }
+.platform-muted { color:#8990a1!important; font-size:12px; }
+.platform-primary-link { display:inline-flex; margin-top:12px; color:#6658bd; font-size:13px; font-weight:750; text-decoration:none; }
+.platform-list-row { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:14px 0; border-top:1px solid #eff0f5; }
+.platform-list-row p { margin:4px 0; }
+.platform-list-row small { color:#9298aa; font-size:10px; }
+.platform-table-wrap { overflow-x:auto; }
+.platform-table-wrap table { width:100%; border-collapse:collapse; text-align:left; font-size:12px; }
+.platform-table-wrap th,.platform-table-wrap td { padding:12px 9px; border-bottom:1px solid #eff0f5; }
+.platform-table-wrap th { color:#858ba0; font-size:10px; text-transform:uppercase; }
+@media(max-width:650px) {
+  .platform-page { padding:22px 14px 40px; }
+  .platform-header,.platform-list-row { flex-direction:column; align-items:stretch; }
+  .platform-card { padding:18px; }
+}
+
+.platform-run-card { padding: 16px 0; border-top: 1px solid #eff0f5; }
+.platform-run-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.platform-run-heading p { margin:5px 0 3px; }
+.platform-run-heading small { color:#9298aa; font-size:10px; }
+.platform-status { display:inline-flex; align-items:center; padding:5px 9px; border-radius:999px; font-size:10px; font-weight:800; text-transform:capitalize; white-space:nowrap; }
+.platform-status-success { background:#e8f6ee; color:#2d8154; }
+.platform-status-failure { background:#fff0ee; color:#b44b4b; }
+.platform-status-running { background:#edf2ff; color:#536cbd; }
+.platform-status-neutral { background:#f1f2f6; color:#6b7183; }
+.platform-analysis { margin-top:13px; padding:14px; border-radius:12px; background:#f8f9fc; }
+.platform-analysis p { margin:9px 0; color:#545b70; }
+.platform-analysis h3 { margin:12px 0 6px; color:#51566a; font-size:11px; font-weight:800; text-transform:uppercase; }
+.platform-analysis ul,.platform-analysis ol { margin:0; padding-left:20px; color:#60677b; font-size:12px; line-height:1.7; }
+.platform-inline-form { display:grid; gap:10px; margin-top:14px; padding:14px; border:1px solid #eef0f6; border-radius:12px; }
+.platform-checkbox { display:flex!important; align-items:center; gap:9px!important; }
+.platform-checkbox input { width:auto!important; min-height:unset!important; }

@@ -1,5 +1,24 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  page.on("pageerror", (error) => {
+    console.error("[BROWSER_PAGE_ERROR]", error.stack ?? error.message);
+  });
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      console.error("[BROWSER_CONSOLE_ERROR]", message.text());
+    }
+  });
+  page.on("requestfailed", (request) => {
+    console.error("[BROWSER_REQUEST_FAILED]", request.method(), request.url(), request.failure()?.errorText ?? "unknown");
+  });
+  page.on("response", (response) => {
+    if (response.status() >= 400) {
+      console.error("[BROWSER_HTTP_ERROR]", response.status(), response.url());
+    }
+  });
+});
+
 test("an unauthenticated visitor is redirected from protected routes to sign in", async ({ page }) => {
   await page.goto("/dashboard");
 
@@ -133,4 +152,19 @@ test("signup uses the same-origin PKCE callback for email confirmation", async (
 
   await expect(page.getByRole("status")).toContainText("If this address can be registered");
   expect(signupRedirect).toBe("http://127.0.0.1:4173/auth/callback");
+});
+
+
+test("new workspace monitoring routes remain protected when signed out", async ({ page }) => {
+  for (const route of ["/teams", "/integrations", "/workflow-runs", "/settings/alerts"]) {
+    await page.goto(route);
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  }
+});
+
+test("invalid workspace invitation token is rejected before any membership change", async ({ page }) => {
+  await page.goto("/accept-invitation?token=not-a-valid-token");
+  await expect(page.getByRole("alert")).toContainText("invitation link is invalid");
+  await expect(page.getByRole("link", { name: "Return to sign in" })).toBeVisible();
 });

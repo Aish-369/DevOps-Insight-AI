@@ -1,0 +1,43 @@
+name: Scheduled alert dispatch
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scheduled-alert-dispatch
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: Dispatch queued workspace alerts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify scheduler configuration
+        env:
+          SUPABASE_FUNCTIONS_URL: ${{ secrets.SUPABASE_FUNCTIONS_URL }}
+          ALERT_SCHEDULER_SECRET: ${{ secrets.ALERT_SCHEDULER_SECRET }}
+        run: |
+          test -n "$SUPABASE_FUNCTIONS_URL" || { echo "::error::Repository secret SUPABASE_FUNCTIONS_URL is not configured."; exit 1; }
+          test -n "$ALERT_SCHEDULER_SECRET" || { echo "::error::Repository secret ALERT_SCHEDULER_SECRET is not configured."; exit 1; }
+          case "$SUPABASE_FUNCTIONS_URL" in
+            https://*/functions/v1) ;;
+            *) echo "::error::SUPABASE_FUNCTIONS_URL must be an HTTPS Supabase functions base URL ending in /functions/v1."; exit 1 ;;
+          esac
+      - name: Dispatch due alerts
+        env:
+          SUPABASE_FUNCTIONS_URL: ${{ secrets.SUPABASE_FUNCTIONS_URL }}
+          ALERT_SCHEDULER_SECRET: ${{ secrets.ALERT_SCHEDULER_SECRET }}
+        run: |
+          response="$(curl --fail-with-body --silent --show-error --retry 2 --retry-all-errors \
+            -X POST "${SUPABASE_FUNCTIONS_URL%/}/dispatch-alerts" \
+            -H "content-type: application/json" \
+            -H "x-scheduler-secret: $ALERT_SCHEDULER_SECRET" \
+            --data '{"mode":"all"}')"
+          printf '%s\n' "$response"
+          printf '%s' "$response" | jq -e '.ok == true'
