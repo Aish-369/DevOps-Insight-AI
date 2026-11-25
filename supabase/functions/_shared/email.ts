@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "./http.ts";
+
 export async function sendEmail(
   to: string,
   subject: string,
@@ -9,14 +11,14 @@ export async function sendEmail(
     throw new Error("Email delivery is not configured.");
   }
 
-  const response = await fetch("https://api.resend.com/emails", {
+  const response = await fetchWithTimeout("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       authorization: `Bearer ${apiKey}`,
       "content-type": "application/json",
     },
     body: JSON.stringify({ from, to: [to], subject, html }),
-  });
+  }, 15_000);
 
   if (!response.ok) {
     console.error("Email provider rejected a message", {
