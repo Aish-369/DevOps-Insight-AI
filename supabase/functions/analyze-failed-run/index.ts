@@ -20,6 +20,7 @@ const MAX_LOG_TEXT_CHARS = 120_000;
 const MAX_LOG_ENTRY_BYTES = 1_000_000;
 const MAX_LOG_ARCHIVE_FILES = 200;
 const MAX_LOG_TOTAL_UNCOMPRESSED_BYTES = 20 * 1024 * 1024;
+const ANALYSIS_PROMPT_VERSION = "ci-triage-v2";
 
 function requiredEnv(name: string): string {
   const value = Deno.env.get(name)?.trim();
@@ -244,7 +245,13 @@ Deno.serve(async (request: Request) => {
       runId,
     );
     const signature = await sha256Hex(
-      [teamId, runId, jobId ?? "all", logText].join(":"),
+      [
+        ANALYSIS_PROMPT_VERSION,
+        teamId,
+        runId,
+        jobId ?? "all",
+        logText,
+      ].join(":"),
     );
     const { data: previous } = await context.admin
       .from("failure_analyses")
@@ -401,7 +408,7 @@ Deno.serve(async (request: Request) => {
       evidence: analysis.evidence,
       confidence: analysis.confidence,
       model,
-      prompt_version: "ci-triage-v1",
+      prompt_version: ANALYSIS_PROMPT_VERSION,
       tokens_in: Number.isSafeInteger(tokensIn) && (tokensIn ?? -1) >= 0
         ? tokensIn
         : null,
