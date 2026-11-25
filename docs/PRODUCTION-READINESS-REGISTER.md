@@ -48,7 +48,8 @@ Never paste secret values into chat or commit them to Git.
 
 - `skip_flaky` is stored as a preference but automatic flaky-run classification is not implemented.
 - User-facing Edge Functions do not yet have a durable shared rate-limiting mechanism. An in-memory per-instance counter is not an acceptable production substitute.
-- GitHub API requests have timeout handling on the current hardening branch; retry/backoff behavior still needs implementation and tests.
+- Request JSON is now streamed with a 16 KB limit; GitHub webhook bodies are streamed with a 2 MB limit. AI log ZIP extraction has per-file, file-count and aggregate expansion limits.
+- GitHub API GET/HEAD requests now use bounded timeout handling and up to two transient-error retries. Non-idempotent provider POST requests are not automatically retried to avoid duplicate side effects. Live provider behavior remains untested.
 - Workflow-job webhook processing expects its parent workflow run to have been synchronized first. Out-of-order delivery needs an explicit reconciliation/retry strategy.
 - Alert dispatch is at-least-once: if a provider accepts a message but the database status update fails, a later retry can send a duplicate. Provider idempotency or a reconciliation strategy is still needed.
 - Current Playwright tests mock the Supabase Auth HTTP boundary. They do not verify live signup, confirmation email, OAuth, password recovery, team isolation, GitHub App, AI, or alert delivery.
