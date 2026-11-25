@@ -390,7 +390,6 @@ Deno.test("workflow_job webhook rejects a repository mapped to another installat
   assertEquals(mock.writes.pendingJobs.length, 0);
 });
 
-
 Deno.test("processed duplicate webhook delivery is acknowledged without reprocessing", async () => {
   const mock = mockAdmin({
     installationId: 456,
