@@ -211,45 +211,6 @@ Deno.serve(async (request: Request) => {
       job = data as Record<string, unknown>;
     }
 
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    const { data: rules } = await context.admin
-      .from("alert_rules")
-      .select("daily_ai_cap")
-      .eq("team_id", teamId)
-      .maybeSingle();
-    const configuredDailyCap = rules?.daily_ai_cap;
-    const dailyCap = typeof configuredDailyCap === "number" &&
-        Number.isSafeInteger(configuredDailyCap)
-      ? configuredDailyCap
-      : 30;
-    if (dailyCap <= 0) {
-      throw new HttpError(
-        429,
-        "AI_DAILY_CAP_DISABLED",
-        "AI analysis is disabled for this team by its daily limit.",
-      );
-    }
-
-    const { count, error: countError } = await context.admin
-      .from("failure_analyses")
-      .select("id", { count: "exact", head: true })
-      .eq("team_id", teamId)
-      .gte("created_at", today.toISOString());
-    if (countError) {
-      throw new HttpError(
-        500,
-        "AI_USAGE_LOOKUP_FAILED",
-        "AI usage could not be checked.",
-      );
-    }
-    if ((count ?? 0) >= dailyCap) {
-      throw new HttpError(
-        429,
-        "AI_DAILY_CAP_REACHED",
-        "This team has reached its daily AI analysis limit.",
-      );
-    }
 
     const logText = await fetchRunLogs(
       installationId,

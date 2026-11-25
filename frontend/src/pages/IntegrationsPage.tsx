@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { RefreshCw, Github, GitBranch } from "lucide-react";
+import { RefreshCw, GitBranch } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import "./PlatformPages.css";
 
@@ -146,7 +146,7 @@ export default function IntegrationsPage() {
         </select>
         <div className="platform-actions">
           <button type="button" onClick={() => void connectGithub()} disabled={!teamId || connecting || loading}>
-            <Github size={16} />
+            <GitBranch size={16} />
             {connecting ? "Opening GitHub…" : "Connect GitHub App"}
           </button>
           <button type="button" className="platform-secondary" onClick={() => void loadData()} disabled={loading}>

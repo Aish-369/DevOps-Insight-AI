@@ -93,6 +93,20 @@ Deno.serve(async (request: Request) => {
       );
     }
 
+    const claimedAt = new Date().toISOString();
+    const { data: claimedState, error: claimError } = await context.admin
+      .from("github_installation_states")
+      .update({ consumed_at: claimedAt })
+      .eq("id", stateRecord.id)
+      .eq("user_id", context.user.id)
+      .is("consumed_at", null)
+      .gt("expires_at", claimedAt)
+      .select("id")
+      .maybeSingle();
+    if (claimError || !claimedState) {
+      throw new HttpError(409, "INSTALLATION_STATE_ALREADY_USED", "This GitHub installation callback was already used. Start a new connection.");
+    }
+
     const installation = await githubAppRequest<GithubInstallation>(
       "/app/installations/" + installationId,
     );
@@ -130,18 +144,6 @@ Deno.serve(async (request: Request) => {
       );
     }
 
-    const { error: consumeError } = await context.admin
-      .from("github_installation_states")
-      .update({ consumed_at: new Date().toISOString() })
-      .eq("id", stateRecord.id)
-      .is("consumed_at", null);
-    if (consumeError) {
-      throw new HttpError(
-        500,
-        "INSTALLATION_STATE_UPDATE_FAILED",
-        "The installation state could not be completed.",
-      );
-    }
 
     await writeAudit(
       context.admin,

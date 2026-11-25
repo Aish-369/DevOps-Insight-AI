@@ -27,6 +27,14 @@ function stringAt(value: unknown, key: string): string | null {
   return typeof raw === "string" && raw.length > 0 ? raw : null;
 }
 
+function branchMatches(pattern: string, branch: string): boolean {
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\function stringAt(value: unknown, key: string): string | null {
+  const raw = isObject(value) ? value[key] : undefined;
+  return typeof raw === "string" && raw.length > 0 ? raw : null;
+}");
+  return new RegExp("^" + escaped.replaceAll("*", ".*") + "$").test(branch);
+}
+
 const ALLOWED_EVENTS = new Set([
   "installation",
   "installation_repositories",
@@ -76,7 +84,10 @@ async function queueAlerts(
       typeof value === "string"
     )
     : [];
-  if (ruleBranches.length > 0 && (!branch || !ruleBranches.includes(branch))) {
+  if (
+    ruleBranches.length > 0 &&
+    (!branch || !ruleBranches.some((pattern) => branchMatches(pattern, branch)))
+  ) {
     return;
   }
   if (kind === "recovered" && rules?.notify_recovered === false) return;
@@ -143,7 +154,7 @@ async function processWorkflowRun(
     actor_login: stringAt(objectAt(run, "actor"), "login"),
     html_url: stringAt(run, "html_url"),
     run_started_at: stringAt(run, "run_started_at"),
-    completed_at: stringAt(run, "updated_at"),
+    completed_at: stringAt(run, "completed_at"),
     github_updated_at: stringAt(run, "updated_at"),
   }, { onConflict: "github_run_id" });
 

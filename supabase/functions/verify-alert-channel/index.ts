@@ -9,7 +9,7 @@ import {
   preflight,
   readJsonObject,
 } from "../_shared/http.ts";
-import { randomNumericCode, sha256Hex } from "../_shared/security.ts";
+import { constantTimeEqual, hmacSha256Hex, randomNumericCode } from "../_shared/security.ts";
 
 Deno.serve(async (request: Request) => {
   const options = preflight(request);
@@ -26,6 +26,10 @@ Deno.serve(async (request: Request) => {
     }
 
     const context = await requireAuth(request);
+    const verificationPepper = Deno.env.get("ALERT_VERIFICATION_PEPPER")?.trim();
+    if (!verificationPepper) {
+      throw new HttpError(503, "ALERT_VERIFICATION_NOT_CONFIGURED", "Alert destination verification is not configured.");
+    }
     const body = await readJsonObject(request);
     const teamId = typeof body.team_id === "string" ? body.team_id : "";
     if (
@@ -87,7 +91,8 @@ Deno.serve(async (request: Request) => {
         );
       }
 
-      const submittedHash = await sha256Hex(
+      const submittedHash = await hmacSha256Hex(
+        verificationPepper,
         [teamId, verificationChannelId, submittedCode].join(":"),
       );
       const attempts = Number(channel.verification_attempts ?? 0);
@@ -98,7 +103,7 @@ Deno.serve(async (request: Request) => {
           "Too many incorrect codes. Wait until the code expires, then request a new one.",
         );
       }
-      if (submittedHash !== channel.verification_code_hash) {
+      if (!constantTimeEqual(submittedHash, channel.verification_code_hash)) {
         const { data: attemptUpdate, error: attemptError } = await context.admin
           .from("alert_channels")
           .update({ verification_attempts: attempts + 1 })
@@ -286,7 +291,10 @@ Deno.serve(async (request: Request) => {
       createdNewChannel = true;
     }
 
-    const codeHash = await sha256Hex([teamId, channelId, code].join(":"));
+    const codeHash = await hmacSha256Hex(
+      verificationPepper,
+      [teamId, channelId, code].join(":"),
+    );
     const { error: hashError } = await context.admin.from("alert_channels")
       .update({ verification_code_hash: codeHash })
       .eq("id", channelId)

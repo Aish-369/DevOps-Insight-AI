@@ -7,6 +7,7 @@ import {
   randomToken,
   redactSecrets,
   sha256Hex,
+  hmacSha256Hex,
 } from "../_shared/security.ts";
 
 Deno.test("sha256Hex returns a stable SHA-256 digest", async () => {
@@ -113,4 +114,11 @@ Deno.test("GitHub PKCS#1 PEM private keys are normalized to usable PKCS#8", asyn
 Deno.test("PKCS#8 private keys are passed through unchanged", () => {
   const pem = "-----BEGIN PRIVATE KEY-----\nYWJj\n-----END PRIVATE KEY-----";
   assertEquals(normalizeGithubPrivateKeyPem(pem), pem);
+});
+
+Deno.test("hmacSha256Hex uses HMAC-SHA256 with the configured pepper", async () => {
+  assertEquals(
+    await hmacSha256Hex("key", "The quick brown fox jumps over the lazy dog"),
+    "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8",
+  );
 });
