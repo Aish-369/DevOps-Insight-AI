@@ -134,3 +134,18 @@ test("signup uses the same-origin PKCE callback for email confirmation", async (
   await expect(page.getByRole("status")).toContainText("If this address can be registered");
   expect(signupRedirect).toBe("http://127.0.0.1:4173/auth/callback");
 });
+
+
+test("new workspace monitoring routes remain protected when signed out", async ({ page }) => {
+  for (const route of ["/teams", "/integrations", "/workflow-runs", "/settings/alerts"]) {
+    await page.goto(route);
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  }
+});
+
+test("invalid workspace invitation token is rejected before any membership change", async ({ page }) => {
+  await page.goto("/accept-invitation?token=not-a-valid-token");
+  await expect(page.getByRole("alert")).toContainText("invitation link is invalid");
+  await expect(page.getByRole("link", { name: "Return to sign in" })).toBeVisible();
+});
