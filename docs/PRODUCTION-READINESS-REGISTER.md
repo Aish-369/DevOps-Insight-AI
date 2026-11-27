@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-11-25  
 Repository: `Aish-369/DevOps-Insight-AI`  
-Working branch: `codex/phase3-platform-backend-2026-11-24`  
+Working branch: `codex/phase4-workspace-context-2026-11-27`  
 Confirmed Supabase target: `mtrmvvtobbbjusiteyvp`
 
 This register distinguishes verified implementation and database migration state from live deployment. Passing isolated CI is not proof that external providers or production workflows are operational.
@@ -43,6 +43,8 @@ All three required GitHub Actions workflows passed on final verified head `ebea4
 - Alert dispatch distinguishes pre-send claims from provider sends. Ambiguous outcomes become `delivery_unknown` and are excluded from automatic retries. Resend email uses a stable idempotency key; Telegram unknown outcomes require provider-side checking before manual resend.
 - New reliability schema migration and FK-index follow-up migration are applied to hosted Supabase and present in the working branch. The canonical migration filename matches hosted version `20261125134153`; the earlier `20261125112000` path is a no-op placeholder retained for history.
 - These behaviors are not live yet because Edge Functions have not been deployed.
+- Phase 4 adds a shared active-workspace preference for the Teams, GitHub App Integrations, and Workflow Runs pages. The preference is stored in browser local storage under a user-scoped key; it stores only the selected workspace ID, validates that ID against the user's currently visible workspaces, and falls back safely when storage is unavailable or a workspace is no longer accessible. No database schema or hosted data was changed.
+- A focused Node test covers user isolation, persisted selection, current-selection precedence, stale workspace fallback, empty workspaces, and blocked storage (10 assertions). GitHub Actions results for the Phase 4 branch must be checked before merge.
 
 ## Deployment blockers
 
