@@ -56,6 +56,24 @@ Set the following project-level values in **Supabase Dashboard → Edge Function
 
 Only set provider credentials for providers the product will actually use. Resend/Telegram/AI providers may have their own free quotas and limits; confirm those separately. Supabase Edge Function secrets are not Vite variables.
 
+## 3A. Recommended AI provider and model
+
+**Selected default: Vercel AI Gateway + OpenAI GPT-6.2 Sol** (`openai/gpt-6.2-sol`).
+
+Why this choice:
+- The existing Edge Function already uses an OpenAI-compatible Chat Completions endpoint, so Gateway can be adopted by changing configuration rather than introducing a new SDK or provider-specific client.
+- GPT-6.2 Sol is the current higher-capability Sol tier suited to complex coding/investigation workflows; CI failure root-cause analysis needs stronger reasoning than a low-cost classification-only model.
+- Gateway gives one server-side credential, provider/model routing and usage visibility. The published model listing currently shows about $2 per million input tokens and $10 per million output tokens; prices can change and long-context rates may differ.
+- Gateway documents per-request prompt-training restrictions for supported providers. Enable the documented no-prompt-training control for requests containing private CI logs. Do not assume Zero Data Retention is available on the current Vercel plan; ZDR has plan/provider restrictions.
+
+Configuration for the existing OpenAI-compatible function:
+- `AI_API_URL=https://ai-gateway.vercel.sh/v1/chat/completions`
+- `AI_MODEL=openai/gpt-6.2-sol`
+- Store the Vercel AI Gateway API key in Supabase Edge Function secret `AI_API_KEY` (the existing function variable name); never put it in a `VITE_` variable.
+- Keep the existing bounded-log handling and credential redaction. Verify the no-prompt-training request option is actually accepted by the Chat Completions endpoint before enabling real customer logs.
+
+**Cost guard:** Vercel documents $5 recurring monthly AI Gateway credits for eligible free users, but obtaining those credits requires a valid payment method. Gateway budgets reject requests after the configured limit, but do not create credits. Do not add a payment method, purchase credits, create a paid key, or enable billing without the project owner's explicit approval. First run a controlled synthetic-log benchmark and inspect actual token usage/cost.
+
 ## 4. Frontend and scheduler configuration
 
 - The Vercel production project already has `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` configured for production and preview. Keep service-role/secret keys out of all `VITE_` variables.
