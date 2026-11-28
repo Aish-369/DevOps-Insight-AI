@@ -1027,3 +1027,75 @@
         width: calc(100vw - 24px);
     }
 }
+.teams-inline-panel {
+  margin-top: 18px;
+  box-shadow: none;
+}
+.teams-inline-form {
+  margin-top: 16px;
+}
+.teams-inline-form select {
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid #e4e6f0;
+  border-radius: 10px;
+  background: #fbfbfe;
+  color: #292d43;
+  font: inherit;
+  font-size: 12px;
+}
+.teams-invitation-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #e9ebf3;
+  border-radius: 14px;
+  background: #fff;
+}
+.teams-invitation-list h3 {
+  margin: 0;
+  color: #30344a;
+  font-size: 14px;
+  font-weight: 800;
+}
+.teams-invitation-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #f1f1f7;
+}
+.teams-invitation-row > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.teams-invitation-row strong {
+  overflow-wrap: anywhere;
+  color: #363a50;
+  font-size: 12px;
+}
+.teams-invitation-row small,
+.teams-muted-action {
+  color: #9298aa;
+  font-size: 10px;
+}
+.teams-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.teams-row-actions .teams-secondary-button,
+.teams-invitation-row .teams-secondary-button {
+  min-height: 30px;
+  padding: 6px 9px;
+  font-size: 10px;
+}
+@media (max-width: 720px) {
+  .teams-members-table th:last-child,
+  .teams-members-table td:last-child {
+    min-width: 160px;
+  }
+}

@@ -1,8 +1,10 @@
 
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, type FormEvent } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 // Import icons supported by lucide-react.
 import { Eye, EyeOff, ArrowRight } from "lucide-react";
+import { getErrorMessage } from "../lib/errorMessage";
+import { getSafeInternalPath } from "../lib/getSafeInternalPath";
 import { supabase } from "../lib/supabase";
 
 export default function LoginPage() {
@@ -11,43 +13,49 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState(false);
   const [error, setError] = useState("");
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextPath = getSafeInternalPath(searchParams.get("next"), window.location.origin);
 
   // Sign in with the user's Supabase account.
-  async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    setLoading(false);
-
-    if (error) {
-      setError(error.message);
-      return;
+    try {
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (loginError) throw loginError;
+      navigate(nextPath, { replace: true });
+    } catch (loginError: unknown) {
+      setError(getErrorMessage(loginError, "Unable to sign in. Please try again."));
+    } finally {
+      setLoading(false);
     }
-
-    navigate("/dashboard");
   }
 
   // Sign in using a GitHub account.
   async function handleGithubLogin() {
     setError("");
+    setOauthLoading(true);
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "github",
-      options: {
-        redirectTo: window.location.origin + "/dashboard",
-      },
-    });
-
-    if (error) setError(error.message);
+    try {
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "github",
+        options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}` },
+      });
+      if (oauthError) throw oauthError;
+    } catch (oauthError: unknown) {
+      setError(getErrorMessage(oauthError, "Unable to start GitHub sign-in. Please try again."));
+    } finally {
+      setOauthLoading(false);
+    }
   }
 
   return (
@@ -160,9 +168,12 @@ export default function LoginPage() {
               </button>
             </div>
 
-            {error && <p className="login-error">{error}</p>}
+            <p className="forgot-password-row">
+              <Link className="forgot-password-link" to="/forgot-password">Forgot password?</Link>
+            </p>
+            {error && <p className="login-error" role="alert">{error}</p>}
 
-            <button type="submit" className="sign-in-button" disabled={loading}>
+            <button type="submit" className="sign-in-button" disabled={loading || oauthLoading}>
               {loading ? "Signing in..." : "Sign in"}
               {!loading && <ArrowRight size={18} />}
             </button>
@@ -178,10 +189,12 @@ export default function LoginPage() {
             type="button"
             className="github-button"
             onClick={handleGithubLogin}
+            disabled={loading || oauthLoading}
+            aria-busy={oauthLoading}
           >
             {/* Show a simple GitHub label instead of the missing icon. */}
 <span className="github-label">GH</span>
-            GitHub
+            {oauthLoading ? "Connecting…" : "GitHub"}
           </button>
 
           <p className="signup-note">

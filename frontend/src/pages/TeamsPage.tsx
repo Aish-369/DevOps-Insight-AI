@@ -36,6 +36,14 @@ type TeamMember = {
   color: string;
 };
 
+type PendingInvitation = {
+  id: string;
+  teamId: string;
+  email: string;
+  role: "admin" | "member";
+  expiresAt: string;
+};
+
 type Team = {
   id: string;
   name: string;
@@ -85,6 +93,12 @@ export default function TeamsPage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [teamName, setTeamName] = useState("");
   const [teamDescription, setTeamDescription] = useState("");
+  const [showInviteForm, setShowInviteForm] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"admin" | "member">("member");
+  const [inviting, setInviting] = useState(false);
+  const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([]);
+  const [memberActionKey, setMemberActionKey] = useState("");
 
   // Loading and notification states.
   const [notice, setNotice] = useState("");
@@ -150,11 +164,29 @@ export default function TeamsPage() {
       // Clear the page when the user has no workspaces.
       if (rows.length === 0) {
         setTeams([]);
+        setPendingInvitations([]);
         setActiveTeamId(null);
         return;
       }
 
       const teamIds = rows.map((team) => team.id);
+
+      // Invitation rows are visible only to team owners and admins through RLS.
+      const { data: invitationRows, error: invitationsError } = await supabase
+        .from("team_invitations")
+        .select("id, team_id, email, role, expires_at")
+        .in("team_id", teamIds)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+
+      if (invitationsError) throw invitationsError;
+      setPendingInvitations((invitationRows ?? []).map((invitation) => ({
+        id: invitation.id,
+        teamId: invitation.team_id,
+        email: invitation.email,
+        role: invitation.role === "admin" ? "admin" : "member",
+        expiresAt: invitation.expires_at,
+      })));
 
       // Fetch actual memberships.
       const { data: memberRows, error: membersError } = await supabase
@@ -377,6 +409,82 @@ export default function TeamsPage() {
       );
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleInviteMember(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setNotice("");
+
+    if (!activeTeam) return;
+    if (activeTeam.myRole === "Member") {
+      setNotice("Only team owners and admins can invite members.");
+      return;
+    }
+
+    const cleanEmail = inviteEmail.trim().toLowerCase();
+    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(cleanEmail)) {
+      setNotice("Enter a valid email address.");
+      return;
+    }
+
+    setInviting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-team-invitation", {
+        body: { team_id: activeTeam.id, email: cleanEmail, role: inviteRole },
+      });
+      if (error) throw error;
+      if (!data?.ok || !data.invitation_id) {
+        throw new Error("Invitation was not created. Check your email provider configuration.");
+      }
+      setInviteEmail("");
+      setInviteRole("member");
+      setShowInviteForm(false);
+      setNotice("Invitation email sent to " + cleanEmail + ".");
+      await loadTeams();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to send the invitation.");
+    } finally {
+      setInviting(false);
+    }
+  }
+
+  async function handleRevokeInvitation(invitationId: string) {
+    if (!activeTeam) return;
+    setMemberActionKey("invite:" + invitationId);
+    setNotice("");
+    try {
+      const { error } = await supabase.functions.invoke("revoke-team-invitation", {
+        body: { team_id: activeTeam.id, invitation_id: invitationId },
+      });
+      if (error) throw error;
+      setNotice("Invitation revoked.");
+      await loadTeams();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to revoke the invitation.");
+    } finally {
+      setMemberActionKey("");
+    }
+  }
+
+  async function handleMemberAction(userId: string, action: "remove" | "set_role", role?: "admin" | "member") {
+    if (!activeTeam) return;
+    const actionKey = "member:" + userId;
+    setMemberActionKey(actionKey);
+    setNotice("");
+    try {
+      const { error } = await supabase.functions.invoke("manage-team-member", {
+        body: { team_id: activeTeam.id, user_id: userId, action, role },
+      });
+      if (error) throw error;
+      setNotice(action === "remove"
+        ? "Member removed from the workspace."
+        : "Member role updated.");
+      await loadTeams();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to update this team member.");
+    } finally {
+      setMemberActionKey("");
     }
   }
 
@@ -675,19 +783,10 @@ export default function TeamsPage() {
                     <p>{activeTeam.description}</p>
                   </div>
 
-                  <button
-                    className="teams-icon-button"
-                    type="button"
-                    title="Workspace settings are coming soon"
-                    aria-label="Workspace settings (coming soon)"
-                    onClick={() =>
-                      setNotice(
-                        "Workspace settings will be available in a later update.",
-                      )
-                    }
-                  >
-                    <ShieldCheck size={19} />
-                  </button>
+                  <span className="teams-role-badge owner" aria-label={"Your role: " + activeTeam.myRole}>
+                    <ShieldCheck size={14} />
+                    {activeTeam.myRole}
+                  </span>
                 </div>
 
                 {/* Workspace statistics */}
@@ -765,6 +864,7 @@ export default function TeamsPage() {
                         <th>Member</th>
                         <th>Role</th>
                         <th>Access</th>
+                        {activeTeam.myRole !== "Member" && <th>Manage</th>}
                       </tr>
                     </thead>
 
@@ -808,6 +908,34 @@ export default function TeamsPage() {
                               Active
                             </span>
                           </td>
+                          {activeTeam.myRole !== "Member" && (
+                            <td>
+                              {member.userId === activeTeam.members.find((item) => item.role === "Owner")?.userId ? (
+                                <span className="teams-muted-action">Owner</span>
+                              ) : (
+                                <div className="teams-row-actions">
+                                  {activeTeam.myRole === "Owner" && (
+                                    <button
+                                      type="button"
+                                      className="teams-secondary-button"
+                                      disabled={memberActionKey === "member:" + member.userId}
+                                      onClick={() => void handleMemberAction(member.userId, "set_role", member.role === "Admin" ? "member" : "admin")}
+                                    >
+                                      {member.role === "Admin" ? "Make member" : "Make admin"}
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="teams-secondary-button"
+                                    disabled={memberActionKey === "member:" + member.userId}
+                                    onClick={() => void handleMemberAction(member.userId, "remove")}
+                                  >
+                                    {memberActionKey === "member:" + member.userId ? "Saving…" : "Remove"}
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -829,19 +957,85 @@ export default function TeamsPage() {
                     {activeTeam.members.length} members
                   </span>
 
-                  <button
-                    type="button"
-                    className="teams-invite-button"
-                    onClick={() =>
-                      setNotice(
-                        "Member invitations are being prepared with secure backend validation.",
-                      )
-                    }
-                  >
-                    <Plus size={16} />
-                    Invite members
-                  </button>
+                  {activeTeam.myRole !== "Member" && (
+                    <button
+                      type="button"
+                      className="teams-invite-button"
+                      onClick={() => {
+                        setShowInviteForm((value) => !value);
+                        setNotice("");
+                      }}
+                    >
+                      <Plus size={16} />
+                      Invite members
+                    </button>
+                  )}
                 </div>
+
+                {showInviteForm && activeTeam.myRole !== "Member" && (
+                  <section className="teams-create-panel teams-inline-panel" aria-labelledby="invite-member-title">
+                    <div className="teams-create-heading">
+                      <div>
+                        <h3 id="invite-member-title">Invite a team member</h3>
+                        <p>An invitation link expires after seven days.</p>
+                      </div>
+                    </div>
+                    <form className="teams-create-form teams-inline-form" onSubmit={handleInviteMember}>
+                      <label>
+                        Email address
+                        <input
+                          type="email"
+                          autoComplete="email"
+                          maxLength={254}
+                          required
+                          value={inviteEmail}
+                          onChange={(event) => setInviteEmail(event.target.value)}
+                          placeholder="colleague@example.com"
+                        />
+                      </label>
+                      <label>
+                        Role
+                        <select
+                          value={inviteRole}
+                          onChange={(event) => setInviteRole(event.target.value as "admin" | "member")}
+                        >
+                          <option value="member">Member</option>
+                          {activeTeam.myRole === "Owner" && <option value="admin">Admin</option>}
+                        </select>
+                      </label>
+                      <div className="teams-form-actions">
+                        <button type="button" className="teams-secondary-button" onClick={() => setShowInviteForm(false)}>
+                          Cancel
+                        </button>
+                        <button type="submit" className="teams-primary-button" disabled={inviting}>
+                          {inviting ? "Sending…" : "Send invitation"}
+                        </button>
+                      </div>
+                    </form>
+                  </section>
+                )}
+
+                {activeTeam.myRole !== "Member" && pendingInvitations.some((invitation) => invitation.teamId === activeTeam.id) && (
+                  <section className="teams-invitation-list" aria-label="Pending invitations">
+                    <h3>Pending invitations</h3>
+                    {pendingInvitations.filter((invitation) => invitation.teamId === activeTeam.id).map((invitation) => (
+                      <div className="teams-invitation-row" key={invitation.id}>
+                        <div>
+                          <strong>{invitation.email}</strong>
+                          <small>{invitation.role} · expires {new Date(invitation.expiresAt).toLocaleDateString()}</small>
+                        </div>
+                        <button
+                          type="button"
+                          className="teams-secondary-button"
+                          disabled={memberActionKey === "invite:" + invitation.id}
+                          onClick={() => void handleRevokeInvitation(invitation.id)}
+                        >
+                          {memberActionKey === "invite:" + invitation.id ? "Revoking…" : "Revoke"}
+                        </button>
+                      </div>
+                    ))}
+                  </section>
+                )}
               </>
             ) : (
               <div className="teams-empty">

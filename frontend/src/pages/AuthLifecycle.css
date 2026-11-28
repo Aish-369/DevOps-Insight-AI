@@ -1,0 +1,189 @@
+.auth-lifecycle-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 28px 16px;
+  background:
+    radial-gradient(ellipse at 12% 12%, #f2e9d9 0, transparent 36%),
+    radial-gradient(ellipse at 88% 90%, #e3eee3 0, transparent 35%),
+    #faf8f3;
+  color: #344238;
+}
+
+.auth-lifecycle-card {
+  width: min(100%, 480px);
+  padding: 38px;
+  border: 1px solid rgba(111, 132, 112, 0.14);
+  border-radius: 24px;
+  background: #fffefa;
+  box-shadow: 0 24px 70px rgba(65, 75, 61, 0.10);
+}
+
+.auth-lifecycle-brand {
+  display: inline-flex;
+  margin-bottom: 32px;
+  color: #718c72;
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.auth-lifecycle-eyebrow {
+  margin: 0 0 10px;
+  color: #82947b;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.8px;
+}
+
+.auth-lifecycle-card h1 {
+  margin: 0 0 10px;
+  color: #303b32;
+  font-size: clamp(25px, 4vw, 32px);
+  font-weight: 750;
+  letter-spacing: -1px;
+}
+
+.auth-lifecycle-description {
+  margin: 0 0 26px;
+  color: #858f84;
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.auth-lifecycle-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.auth-lifecycle-form h2 {
+  margin: 14px 0 4px;
+  color: #39483b;
+  font-size: 16px;
+  font-weight: 750;
+}
+
+.auth-lifecycle-form label {
+  color: #4d584e;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.auth-lifecycle-form input {
+  width: 100%;
+  min-height: 47px;
+  padding: 0 14px;
+  border: 1px solid #e4e8df;
+  border-radius: 11px;
+  outline: none;
+  color: #344238;
+  background: #fcfcf8;
+  font-size: 13px;
+}
+
+.auth-lifecycle-form input:focus {
+  border-color: #8ca58a;
+  box-shadow: 0 0 0 3px rgba(140, 165, 138, 0.13);
+}
+
+.auth-lifecycle-form input:disabled {
+  color: #7b857a;
+  background: #f3f4ee;
+}
+
+.auth-lifecycle-form button,
+.auth-lifecycle-card > button,
+.auth-lifecycle-card div > button {
+  min-height: 47px;
+  margin-top: 10px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 11px;
+  color: #fff;
+  background: #718c72;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-lifecycle-form button:hover:not(:disabled),
+.auth-lifecycle-card > button:hover,
+.auth-lifecycle-card div > button:hover {
+  background: #5f7c61;
+}
+
+.auth-lifecycle-form button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.auth-lifecycle-error,
+.auth-lifecycle-success {
+  margin: 7px 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.auth-lifecycle-error {
+  color: #bd514a;
+}
+
+.auth-lifecycle-success {
+  color: #397b58;
+}
+
+.auth-lifecycle-footer {
+  margin: 24px 0 0;
+  color: #858f84;
+  text-align: center;
+  font-size: 12px;
+}
+
+.auth-lifecycle-footer a,
+.auth-lifecycle-primary-link {
+  color: #617d62;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.auth-lifecycle-footer a:hover,
+.auth-lifecycle-primary-link:hover,
+.forgot-password-link:hover {
+  text-decoration: underline;
+}
+
+.auth-lifecycle-primary-link {
+  display: inline-flex;
+  margin-top: 12px;
+  font-size: 13px;
+}
+
+.auth-settings-card {
+  width: min(100%, 560px);
+}
+
+.auth-settings-password-form {
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid #edf0e9;
+}
+
+.forgot-password-row {
+  margin: 8px 0 0;
+  text-align: right;
+}
+
+.forgot-password-link {
+  color: #718c72;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+@media (max-width: 480px) {
+  .auth-lifecycle-card {
+    padding: 28px 22px;
+    border-radius: 20px;
+  }
+}

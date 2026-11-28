@@ -1,42 +1,93 @@
-
-# DevOps Insight AI - Frontend CI Pipeline
-
 name: Frontend CI
 
-# Run automatically when code is pushed or a PR is opened.
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - codex/phase1-foundation-2026-11-24
+      - codex/phase2-auth-lifecycle-2026-11-24
+      - codex/phase3-platform-backend-2026-11-24
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - codex/phase1-foundation-2026-11-24
+      - codex/phase2-auth-lifecycle-2026-11-24
   workflow_dispatch:
 
-jobs:
-  frontend-build:
-    name: Build React Frontend
-    runs-on: ubuntu-latest
+permissions:
+  contents: read
 
+concurrency:
+  group: frontend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-quality:
+    name: Frontend quality gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Non-production localhost-only values allow deterministic CI builds.
+      # Playwright uses the same test-only Supabase URL/key in its web server.
+      VITE_SUPABASE_URL: http://127.0.0.1:54321
+      VITE_SUPABASE_PUBLISHABLE_KEY: eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJyb2xlIjoiYW5vbiJ9.ci-placeholder
     defaults:
       run:
         working-directory: frontend
-
     steps:
-      # Download repository code.
       - name: Checkout repository
-        uses: actions/checkout@v4
-
-      # Install Node.js.
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: "22"
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-
-      # Install dependencies from lockfile.
-      - name: Install dependencies
+      - name: Install locked dependencies
         run: npm ci
-
-      # Check TypeScript and create production build.
-      - name: Build frontend
+      - name: Audit dependencies
+        run: npm audit --audit-level=moderate
+      - name: Check Vite security floor
+        run: npm run security:check
+      - name: Run foundation tests
+        run: npm test
+      - name: Run ESLint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build production bundle
         run: npm run build
+      - name: Install Chromium for browser tests
+        run: npx playwright install --with-deps chromium
+      - name: Run browser regression tests
+        run: npm run test:e2e
+
+      - name: Package clean source bundle
+        working-directory: .
+        run: |
+          set -euo pipefail
+          sensitive_files="$(git ls-tree -r --name-only "$GITHUB_SHA" \
+            | grep -E '(^|/)\.env($|\.)|(^|/)([^/]*\.(pem|key|p12|pfx)|id_rsa|id_ed25519)$' \
+            | grep -Ev '(^|/)\.env(\..*)?\.example$' || true)"
+          if [ -n "$sensitive_files" ]; then
+            echo "::error::Refusing to package tracked environment or private-key files:"
+            printf '%s\n' "$sensitive_files"
+            exit 1
+          fi
+
+          archive="$RUNNER_TEMP/DevOps-Insight-AI-source.zip"
+          git archive --format=zip --prefix=DevOps-Insight-AI/ "$GITHUB_SHA" -o "$archive"
+          test -s "$archive"
+          unzip -t "$archive"
+          echo "Source bundle created from commit $GITHUB_SHA"
+
+      - name: Upload verified source ZIP
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: ${{ runner.temp }}/DevOps-Insight-AI-source.zip
+          archive: false
+          if-no-files-found: error
+          retention-days: 7

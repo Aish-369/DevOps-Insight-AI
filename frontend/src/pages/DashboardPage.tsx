@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Activity,
@@ -8,6 +8,9 @@ import {
   LogOut,
   RefreshCw,
   ShieldCheck,
+  Settings,
+  Users,
+  Bell,
   Workflow,
 } from "lucide-react";
 
@@ -36,6 +39,7 @@ export default function DashboardPage() {
 
   // Store logout errors.
   const [logoutError, setLogoutError] = useState("");
+  const [platformStats, setPlatformStats] = useState({ teams: "—", runs: "—", alerts: "—" });
 
   // Load the GitHub username from the signed-in user's Supabase profile.
   const {
@@ -83,6 +87,38 @@ export default function DashboardPage() {
     return () => {
       active = false;
     };
+  }, []);
+
+  // Load team-scoped platform counters; keep them unavailable until the migration is deployed.
+  useEffect(() => {
+    let active = true;
+    async function loadPlatformStats() {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData.user) return;
+
+      const { data: teamRows, error: teamError } = await supabase.from("teams").select("id");
+      if (!active || teamError || !teamRows) return;
+      const teamIds = teamRows.map((team) => team.id);
+      if (teamIds.length === 0) {
+        setPlatformStats({ teams: "0", runs: "0", alerts: "0" });
+        return;
+      }
+
+      const [runResult, alertResult] = await Promise.all([
+        supabase.from("workflow_runs").select("github_run_id", { count: "exact", head: true }).in("team_id", teamIds),
+        supabase.from("alerts_sent").select("id", { count: "exact", head: true }).in("team_id", teamIds).in("status", ["pending", "failed"]),
+      ]);
+      if (!active) return;
+      setPlatformStats({
+        teams: String(teamRows.length),
+        runs: runResult.error ? "—" : String(runResult.count ?? 0),
+        alerts: alertResult.error ? "—" : String(alertResult.count ?? 0),
+      });
+    }
+    void loadPlatformStats().catch(() => {
+      if (active) setPlatformStats({ teams: "—", runs: "—", alerts: "—" });
+    });
+    return () => { active = false; };
   }, []);
 
   // Get the first available public repository.
@@ -193,16 +229,17 @@ export default function DashboardPage() {
   async function handleLogout() {
     setLogoutError("");
 
-    const { error: signOutError } =
-      await supabase.auth.signOut();
-
-    if (signOutError) {
-      setLogoutError(signOutError.message);
-      return;
+    try {
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) throw signOutError;
+      navigate("/login", { replace: true });
+    } catch (signOutError: unknown) {
+      setLogoutError(
+        signOutError instanceof Error
+          ? signOutError.message
+          : "Unable to sign out. Please try again.",
+      );
     }
-
-    // Return to the login page after signing out.
-    navigate("/login", { replace: true });
   }
 
   // Prepare the dashboard statistics.
@@ -220,17 +257,17 @@ export default function DashboardPage() {
     },
     {
       label: "Pipeline Runs",
-      value: "—",
+      value: platformStats.runs,
       icon: Workflow,
     },
     {
       label: "Active Alerts",
-      value: "—",
+      value: platformStats.alerts,
       icon: Activity,
     },
     {
       label: "Connected Teams",
-      value: "—",
+      value: platformStats.teams,
       icon: ShieldCheck,
     },
   ];
@@ -289,6 +326,26 @@ export default function DashboardPage() {
           >
             <Activity size={19} />
             <span>Activity Audit</span>
+          </Link>
+
+          <Link to="/teams" className="dashboard-nav-item">
+            <Users size={19} /><span>Teams</span>
+          </Link>
+          <Link to="/integrations" className="dashboard-nav-item">
+            <GitBranch size={19} /><span>GitHub App</span>
+          </Link>
+          <Link to="/workflow-runs" className="dashboard-nav-item">
+            <Workflow size={19} /><span>Workflow Runs</span>
+          </Link>
+          <Link to="/settings/alerts" className="dashboard-nav-item">
+            <Bell size={19} /><span>Alerts</span>
+          </Link>
+          <Link
+            to="/settings/account"
+            className="dashboard-nav-item"
+          >
+            <Settings size={19} />
+            <span>Account settings</span>
           </Link>
         </nav>
 
