@@ -103,6 +103,194 @@ export function handleError(request: Request, error: unknown): Response {
   );
 }
 
+const MAX_JSON_BODY_BYTES = 16_384;
+
+/** Read raw request bytes without buffering an unbounded incoming body. */
+export async function readRequestBytes(
+  request: Request,
+  maxBytes: number,
+): Promise<Uint8Array> {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) {
+    throw new Error("The request byte limit must be a positive integer.");
+  }
+  const declaredLength = Number(request.headers.get("content-length") ?? "");
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    throw new HttpError(
+      413,
+      "PAYLOAD_TOO_LARGE",
+      "The request payload is too large.",
+    );
+  }
+
+  const reader = request.body?.getReader();
+  if (!reader) return new Uint8Array();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      totalBytes += chunk.value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel();
+        throw new HttpError(
+          413,
+          "PAYLOAD_TOO_LARGE",
+          "The request payload is too large.",
+        );
+      }
+      chunks.push(chunk.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const result = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return result;
+}
+
+/** Read an upstream response body with a hard streaming byte limit. */
+export async function readResponseBytes(
+  response: Response,
+  maxBytes: number,
+  errorCode = "UPSTREAM_RESPONSE_TOO_LARGE",
+): Promise<Uint8Array> {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) {
+    throw new Error("The response byte limit must be a positive integer.");
+  }
+
+  const declaredLengthHeader = response.headers.get("content-length");
+  const declaredLength = declaredLengthHeader === null
+    ? Number.NaN
+    : Number(declaredLengthHeader);
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    await response.body?.cancel();
+    throw new HttpError(
+      413,
+      errorCode,
+      "The upstream response exceeds the configured size limit.",
+    );
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) return new Uint8Array();
+
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      totalBytes += chunk.value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel();
+        throw new HttpError(
+          413,
+          errorCode,
+          "The upstream response exceeds the configured size limit.",
+        );
+      }
+      chunks.push(chunk.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const result = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return result;
+}
+
+/**
+ * Fetch an upstream service with a bounded lifetime. The timeout signal remains
+ * attached to the response so a stalled response body is also aborted.
+ */
+export async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs = 15_000,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Response> {
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) {
+    throw new Error("The upstream timeout must be a positive integer.");
+  }
+  const signal = AbortSignal.timeout(timeoutMs);
+  try {
+    return await fetchImpl(input, { ...init, signal });
+  } catch (error) {
+    if (signal.aborted) {
+      throw new HttpError(
+        504,
+        "UPSTREAM_TIMEOUT",
+        "An external service did not respond in time.",
+      );
+    }
+    throw error;
+  }
+}
+
+export async function fetchWithRetry(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  options: { timeoutMs?: number; maxRetries?: number } = {},
+  fetchImpl: typeof fetch = fetch,
+): Promise<Response> {
+  const method = (init.method ?? "GET").toUpperCase();
+  if (method !== "GET" && method !== "HEAD") {
+    throw new Error(
+      "Automatic retries are restricted to idempotent GET/HEAD requests.",
+    );
+  }
+
+  const timeoutMs = options.timeoutMs ?? 15_000;
+  const maxRetries = options.maxRetries ?? 2;
+  if (!Number.isSafeInteger(maxRetries) || maxRetries < 0 || maxRetries > 3) {
+    throw new Error("The retry count must be between zero and three.");
+  }
+
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    const response = await fetchWithTimeout(input, init, timeoutMs, fetchImpl);
+    const githubRateLimit403 = response.status === 403 && (
+      response.headers.has("retry-after") ||
+      response.headers.get("x-ratelimit-remaining") === "0"
+    );
+    const retryable = [429, 500, 502, 503, 504].includes(response.status) ||
+      githubRateLimit403;
+    if (!retryable || attempt === maxRetries) return response;
+
+    const retryAfter = response.headers.get("retry-after");
+    const retryAfterSeconds = retryAfter === null
+      ? Number.NaN
+      : Number(retryAfter);
+    const retryAfterDate = retryAfter === null
+      ? Number.NaN
+      : Date.parse(retryAfter);
+    const delayMs = Number.isFinite(retryAfterSeconds)
+      ? retryAfterSeconds * 1_000
+      : Number.isFinite(retryAfterDate)
+      ? Math.max(0, retryAfterDate - Date.now())
+      : 250 * (2 ** attempt);
+
+    // Do not violate a provider's longer Retry-After window inside a short-lived function.
+    if (delayMs > 2_000) return response;
+    await response.body?.cancel();
+    if (delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  throw new Error("Unreachable retry state.");
+}
+
 export async function readJsonObject(
   request: Request,
 ): Promise<Record<string, unknown>> {
@@ -115,9 +303,30 @@ export async function readJsonObject(
     );
   }
 
-  const raw = await request.text();
-  if (raw.length > 16_384) {
-    throw new HttpError(413, "REQUEST_TOO_LARGE", "The request is too large.");
+  const reader = request.body?.getReader();
+  const decoder = new TextDecoder();
+  let raw = "";
+  let totalBytes = 0;
+  if (reader) {
+    try {
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        totalBytes += chunk.value.byteLength;
+        if (totalBytes > MAX_JSON_BODY_BYTES) {
+          await reader.cancel();
+          throw new HttpError(
+            413,
+            "REQUEST_TOO_LARGE",
+            "The request is too large.",
+          );
+        }
+        raw += decoder.decode(chunk.value, { stream: true });
+      }
+      raw += decoder.decode();
+    } finally {
+      reader.releaseLock();
+    }
   }
 
   let parsed: unknown;
