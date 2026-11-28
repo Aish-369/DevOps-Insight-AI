@@ -32,7 +32,7 @@ Deno.serve(async (request: Request) => {
     if (
       !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
         .test(teamId) ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i
         .test(userId)
     ) {
       throw new HttpError(
@@ -77,6 +77,17 @@ Deno.serve(async (request: Request) => {
         404,
         "TEAM_MEMBER_NOT_FOUND",
         "The team member was not found.",
+      );
+    }
+
+    // Owner membership is immutable through member management, even when a
+    // workspace has multiple owners. Ownership transfer must use a separate,
+    // explicitly designed and audited operation.
+    if (target.role === "owner") {
+      throw new HttpError(
+        403,
+        "OWNER_MEMBERSHIP_PROTECTED",
+        "Owner membership cannot be changed or removed through member management.",
       );
     }
 
