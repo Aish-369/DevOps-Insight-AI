@@ -1,4 +1,5 @@
 import { requireAuth, requireTeamRole, writeAudit } from "../_shared/auth.ts";
+import { getMemberManagementDenial } from "../_shared/member-management.ts";
 import {
   assertAllowedOrigin,
   handleError,
@@ -50,13 +51,6 @@ Deno.serve(async (request: Request) => {
     }
 
     const actorRole = await requireTeamRole(context, teamId);
-    if (actorRole === "member") {
-      throw new HttpError(
-        403,
-        "TEAM_ADMIN_REQUIRED",
-        "Only team owners and administrators can manage members.",
-      );
-    }
     if (context.user.id === userId) {
       throw new HttpError(
         400,
@@ -80,23 +74,21 @@ Deno.serve(async (request: Request) => {
       );
     }
 
-    // Owner membership is immutable through member management, even when a
-    // workspace has multiple owners. Ownership transfer must use a separate,
-    // explicitly designed and audited operation.
-    if (target.role === "owner") {
-      throw new HttpError(
-        403,
-        "OWNER_MEMBERSHIP_PROTECTED",
-        "Owner membership cannot be changed or removed through member management.",
-      );
-    }
-
-    if (actorRole === "admin" && target.role !== "member") {
-      throw new HttpError(
-        403,
-        "OWNER_PERMISSION_REQUIRED",
-        "Administrators can manage member accounts only.",
-      );
+    const denial = getMemberManagementDenial({
+      actorRole: actorRole as "owner" | "admin" | "member",
+      targetRole: target.role as "owner" | "admin" | "member",
+      action,
+      requestedRole,
+    });
+    if (denial) {
+      const messages: Record<string, string> = {
+        TEAM_ADMIN_REQUIRED: "Only team owners and administrators can manage members.",
+        OWNER_MEMBERSHIP_PROTECTED: "Owner membership cannot be changed or removed through member management.",
+        OWNER_PERMISSION_REQUIRED: "Only the owner can manage administrator accounts or promote members.",
+        INVALID_ROLE: "A member can be assigned only the member or admin role. Ownership transfer is a separate action.",
+      };
+      const status = denial === "INVALID_ROLE" ? 400 : 403;
+      throw new HttpError(status, denial, messages[denial] ?? "This membership operation is not allowed.");
     }
 
     if (action === "set_role") {
