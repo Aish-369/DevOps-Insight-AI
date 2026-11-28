@@ -26,9 +26,14 @@ This register separates code/CI verification from hosted deployment and live-pro
 - Latest Health Advisor check: no findings.
 - Latest Security Advisor check: one warning — leaked-password protection is disabled. This capability is unavailable on the current Supabase Free plan.
 - Previous Performance Advisor check reported unused-index informational findings. No indexes were removed.
-- Latest Edge Function inventory check: **zero Edge Functions deployed**.
+- Latest Edge Function inventory check (2026-11-28): **zero Edge Functions deployed**.
+- Vercel production deployment for `main` is READY at `https://dev-ops-insight-ai.vercel.app`; the project domain is verified. The live origin returned HTTP 200.
+- Vercel production and preview environments have `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` configured. No decrypted environment values were requested or exposed.
 
 ## CI verification
+
+- Integrated `main` commit `f34a74294632d3303303ece4f7b8e98fbb1af0be`: Frontend CI, Edge Functions CI and Database Security CI passed on the integration PR head; Frontend CI also passed on the subsequent readiness-register commit `9486d2249c78adbdba767a70bbdb01cb1e99f57b`.
+- Documentation follow-up commits update the production origin and deployment instructions. Their latest Frontend CI run is tracked at [run 46154337720](https://github.com/Aish-369/DevOps-Insight-AI/actions/runs/46154337720); verify it is green before treating the docs tip as fully validated.
 
 All three GitHub Actions workflows passed on the Phase 4 head `3a329423e66142aaa88589fbaf950f37c02ee34f` and the integration PR head `fb138a17aebb72d31927aa2403ec8aa28b8b4a8c`. The integration PR's checks were:
 
@@ -56,19 +61,19 @@ The Phase 3 head `d2f970c46496367541a9b2a30e674abf3130f930` also has successful 
 
 | Item | Status | Required next action |
 |---|---|---|
-| Production frontend HTTPS origin | BLOCKED | Owner must provide the exact deployed URL/origin |
-| Frontend Supabase environment | BLOCKED | Configure project URL and publishable key in the frontend host |
-| Supabase Auth Site URL and redirect allow-list | BLOCKED | Configure only after the production origin is known |
+| Production frontend HTTPS origin | COMPLETE | Verified Vercel production domain: `https://dev-ops-insight-ai.vercel.app`; live origin returned HTTP 200 |
+| Frontend Supabase environment | CONFIGURED | Vercel production/preview have `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` |
+| Supabase Auth Site URL and redirect allow-list | NOT VERIFIED | Configure/verify Site URL `https://dev-ops-insight-ai.vercel.app` and callback `/auth/callback` in Supabase Auth settings |
 | Real email/OAuth authentication | NOT TESTED | Configure provider/SMTP and test with controlled accounts |
-| GitHub App registration | NOT TESTED | Configure App ID, slug, private key and webhook secret in secure settings |
+| GitHub App registration | BLOCKED | Register the GitHub App and configure App ID, slug, private key and webhook secret in secure settings; GitHub connector cannot create a custom App |
 | Edge Function secrets | BLOCKED | Configure only the providers selected for launch in Supabase Dashboard |
 | Email alerts/invitations | NOT TESTED | Configure Resend and verified sender if email is enabled |
 | Telegram alerts | NOT TESTED | Configure bot token if Telegram is enabled |
 | AI analysis provider | NOT TESTED | Select and configure an approved OpenAI-compatible endpoint/model |
 | GitHub scheduler secrets | BLOCKED | Configure `SUPABASE_FUNCTIONS_URL` and matching `ALERT_SCHEDULER_SECRET` in GitHub Actions |
-| Edge Function deployment | BLOCKED | Deploy after origin, secrets and final code review are complete |
+| Edge Function deployment | BLOCKED | Zero functions are deployed. Deploy only after required server-side secrets and GitHub App/provider choices are configured |
 | Live end-to-end acceptance | NOT TESTED | Test auth, invitations, RBAC, GitHub webhook, workflow ingestion, AI analysis and notifications using controlled accounts and a non-production repository |
-| Ordered PR integration | COMPLETE | PRs #8, #11, #12 and integration PR #13 are merged; PR #9 and #10 had already been merged into their stacked parent branches |
+| Ordered PR integration | COMPLETE | PRs #8, #11, #12 and #13 are merged; PR #9 and #10 had already been merged into their stacked parent branches |
 
 Never paste secret values into chat or commit them to Git. Configure secrets directly in the relevant provider dashboards.
 
@@ -86,12 +91,12 @@ Never paste secret values into chat or commit them to Git. Configure secrets dir
 - PR #9 (Phase 2) and PR #10 (Phase 3) were merged into their stacked parent branches.
 - PR #11 (Phase 3 reliability) and PR #12 (Phase 4 workspace context) are merged in dependency order.
 - PR #13 integrated Phase 3 reliability and Phase 4 into `main`; merged commit: `f34a74294632d3303303ece4f7b8e98fbb1af0be`.
-- The integration PR passed Frontend, Edge Functions and Database Security CI. Main-branch Frontend CI was re-triggered by the merge and must be checked independently.
+- The integration PR passed Frontend, Edge Functions and Database Security CI. The integrated `main` commit and the following readiness-register commit passed Frontend CI. The newest documentation-tip Frontend CI run is still being verified.
 - Legacy PR #7 remains open but has merge conflicts and contains an older, broad UI snapshot; it was not included in the Phase 1–4 integration.
 - Repository code is integrated. Hosted deployment and external-provider acceptance remain separate release steps.
 
 ## Release decision
 
-**NOT PRODUCTION READY — PROVIDER CONFIGURATION, EDGE FUNCTION DEPLOYMENT AND LIVE ACCEPTANCE REMAIN.**
+**NOT PRODUCTION READY — GITHUB APP / PROVIDER CONFIGURATION, SUPABASE AUTH REDIRECT VERIFICATION, EDGE FUNCTION DEPLOYMENT AND LIVE ACCEPTANCE REMAIN.**
 
 Change this decision only after the final merged commit passes CI, frontend hosting and Auth redirects are configured, secrets are safely provisioned, Edge Functions are deployed, and end-to-end acceptance tests pass.
