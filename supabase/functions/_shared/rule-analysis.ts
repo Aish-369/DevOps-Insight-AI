@@ -17,7 +17,8 @@ const RULES: DiagnosticRule[] = [
   {
     pattern: /npm ERR! code ERESOLVE|unable to resolve dependency tree/i,
     category: "dependency-conflict",
-    cause: "The package manager could not resolve compatible dependency versions.",
+    cause:
+      "The package manager could not resolve compatible dependency versions.",
     fixSteps: [
       "Review the conflicting package versions in package.json and the lockfile.",
       "Reproduce with the repository's documented Node.js and npm versions before changing dependencies.",
@@ -116,7 +117,8 @@ export function analyzeLogsWithRules(logs: string): FailureAnalysis {
 
   return {
     category: "unknown",
-    cause: "No known failure signature was detected. The logs need manual review; no root cause can be asserted safely.",
+    cause:
+      "No known failure signature was detected. The logs need manual review; no root cause can be asserted safely.",
     fix_steps: [
       "Open the failed job in GitHub Actions and inspect the earliest error preceding the final failure summary.",
       "Review the surrounding log context and rerun only after identifying a safe, testable correction.",
