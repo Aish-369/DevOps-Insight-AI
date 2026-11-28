@@ -125,7 +125,7 @@ export default function AlertsSettingsPage() {
     setSaving(true); setError(""); setNotice("");
     const branches = branchesText.split(",").map((branch) => branch.trim()).filter(Boolean).slice(0, 100);
     if (!Number.isInteger(dailyCap) || dailyCap < 0 || dailyCap > 500) {
-      setError("Daily AI cap must be between 0 and 500.");
+      setError("Daily failure-analysis limit must be between 0 and 500.");
       setSaving(false);
       return;
     }
@@ -213,7 +213,7 @@ export default function AlertsSettingsPage() {
             <input id="alert-branches" value={branchesText} onChange={(event) => setBranchesText(event.target.value)} placeholder="main, release/*" />
             <label className="platform-checkbox"><input type="checkbox" checked={notifyRecovered} onChange={(event) => setNotifyRecovered(event.target.checked)} /> Notify when a workflow recovers</label>
             <label className="platform-checkbox"><input type="checkbox" checked={skipFlaky} onChange={(event) => setSkipFlaky(event.target.checked)} /> Suppress failure alerts when a later retry succeeds (10-minute grace period)</label>
-            <label htmlFor="daily-ai-cap">Daily AI analysis limit per team</label>
+            <label htmlFor="daily-ai-cap">Daily failure-analysis limit per team</label>
             <input id="daily-ai-cap" type="number" min={0} max={500} value={dailyCap} onChange={(event) => setDailyCap(Number(event.target.value))} />
             <button type="button" onClick={() => void saveRules()} disabled={saving}>Save rules</button>
           </section>
