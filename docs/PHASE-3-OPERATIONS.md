@@ -1,7 +1,7 @@
 # Phase 3 — Operations and deployment guide
 
 **Confirmed Supabase target:** `mtrmvvtobbbjusiteyvp`  
-**Current state (2026-11-25):** Seven migrations listed below are applied. The reliability and workflow-attempt index migrations are now applied and verified. No Edge Functions have been deployed yet. No paid Supabase development branch was created.
+**Current state (2026-11-28):** Seven migrations listed below are applied and verified. The Supabase project is ACTIVE_HEALTHY and currently has zero Edge Functions deployed. The Vercel frontend is live at `https://dev-ops-insight-ai.vercel.app` (verified production domain). No paid Supabase development branch was created.
 
 ## 1. Database state — already applied
 
@@ -26,8 +26,8 @@ The original source for the pre-existing workspace foundation migration was unav
 
 Configure the confirmed project's Auth URL settings after the frontend production origin is known:
 
-- Site URL: the deployed browser application's origin.
-- Redirect allow-list: the application's `/auth/callback` route.
+- Site URL: `https://dev-ops-insight-ai.vercel.app`.
+- Redirect allow-list: `https://dev-ops-insight-ai.vercel.app/auth/callback` (plus only the required local development callback URLs).
 - Password minimum length: use at least 8 characters and enable the strongest character requirements available on the plan.
 
 **Free-plan limitation:** Supabase's leaked-password protection (HaveIBeenPwned check) is Pro-and-above only. The Security Advisor warning will remain on Free; there is no free-plan workaround. See the [Supabase password security documentation](https://supabase.com/docs/guides/auth/password-security).
@@ -58,14 +58,14 @@ Only set provider credentials for providers the product will actually use. Resen
 
 ## 4. Frontend and scheduler configuration
 
-- Set the frontend's public Supabase URL and publishable key in its hosting environment.
-- Set `APP_BASE_URL` to the exact deployed frontend origin. Without it, browser requests from a non-loopback origin are rejected by CORS.
-- For the scheduled alert workflow, add GitHub repository secrets `SUPABASE_FUNCTIONS_URL` (the target project's `/functions/v1` base URL) and `ALERT_SCHEDULER_SECRET` (same value as the Supabase function secret).
-- Configure Supabase Auth Site URL and redirect allow-list to the actual deployed frontend URL.
+- The Vercel production project already has `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` configured for production and preview. Keep service-role/secret keys out of all `VITE_` variables.
+- Verified frontend production origin: `https://dev-ops-insight-ai.vercel.app` (verified Vercel domain). Set `APP_BASE_URL` to this exact origin in Supabase Edge Function secrets. Without it, browser requests from the deployed origin are rejected by CORS.
+- For the scheduled alert workflow, add GitHub repository secrets `SUPABASE_FUNCTIONS_URL` (`https://mtrmvvtobbbjusiteyvp.supabase.co/functions/v1`) and `ALERT_SCHEDULER_SECRET` (identical to the Supabase function secret). Confirm both names are present without printing secret values.
+- Configure and verify Supabase Auth Site URL and redirect allow-list using the deployed frontend origin and `/auth/callback` route.
 
 ## 5. Function deployment and verification
 
-The target currently has zero deployed Edge Functions. Deploy the version-controlled functions only after the required secrets and frontend origin are configured. The function config intentionally sets `verify_jwt = false`; every user-facing function performs its own Supabase user authentication and team-role checks, while the GitHub webhook validates the raw-body HMAC signature and the scheduler uses its independent secret. Do not change those checks or expose service credentials in the browser.
+The target currently has zero deployed Edge Functions. The Vercel frontend is deployed, but deploy the version-controlled functions only after all required secrets are safely configured and the exact Auth redirect settings are verified. The function config intentionally sets `verify_jwt = false`; every user-facing function performs its own Supabase user authentication and team-role checks, while the GitHub webhook validates the raw-body HMAC signature and the scheduler uses its independent secret. Do not change those checks or expose service credentials in the browser.
 
 ### Reliability behavior to understand before operating
 
