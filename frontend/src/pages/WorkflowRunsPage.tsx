@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { RefreshCw, Sparkles, Workflow } from "lucide-react";
+import { RefreshCw, Search, Workflow } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { resolveActiveWorkspaceId, saveActiveWorkspaceId } from "../lib/workspaceSelection.js";
 import "./PlatformPages.css";
@@ -129,10 +129,10 @@ export default function WorkflowRunsPage() {
       });
       if (requestError) throw requestError;
       if (!data?.ok || !data.analysis) throw new Error("The analysis did not complete.");
-      setNotice(data.reused ? "An existing analysis was reused." : "AI analysis completed.");
+      setNotice(data.reused ? "An existing analysis was reused." : "Failure diagnostics completed.");
       await loadData();
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "AI analysis is not available.");
+      setError(requestError instanceof Error ? requestError.message : "Failure diagnostics are not available.");
     } finally {
       setAnalyzingRunId(null);
     }
@@ -182,7 +182,7 @@ export default function WorkflowRunsPage() {
                 {run.html_url && <a href={run.html_url} target="_blank" rel="noreferrer">Open run ↗</a>}
                 {runFailed && (
                   <button type="button" onClick={() => void analyze(run.github_run_id)} disabled={analyzingRunId === run.github_run_id}>
-                    <Sparkles size={15} /> {analyzingRunId === run.github_run_id ? "Analyzing…" : analysis ? "Re-analyze failure" : "Analyze failure"}
+                    <Search size={15} /> {analyzingRunId === run.github_run_id ? "Analyzing…" : analysis ? "Re-analyze failure" : "Analyze failure"}
                   </button>
                 )}
               </div>
@@ -211,7 +211,7 @@ export default function WorkflowRunsPage() {
           );
         })}
       </section>
-      <p className="platform-muted">AI output is an assistive hypothesis, not an automatically applied code change. Review the linked logs and evidence before acting.</p>
+      <p className="platform-muted">Diagnostics use deterministic log signatures, not a hosted AI model. Treat suggestions as hypotheses and review the linked logs and evidence before acting.</p>
     </main>
   );
 }
