@@ -204,7 +204,6 @@ Deno.serve(async (request: Request) => {
     }
     installationId = Number(repository.installation_id);
 
-    let job: Record<string, unknown> | null = null;
     if (jobId !== null) {
       const { data, error } = await context.admin
         .from("workflow_jobs")
@@ -220,7 +219,6 @@ Deno.serve(async (request: Request) => {
           "The workflow job was not found for this team run.",
         );
       }
-      job = data as Record<string, unknown>;
     }
 
     const logText = await fetchRunLogs(
