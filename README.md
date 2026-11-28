@@ -60,11 +60,14 @@ The frontend talks to Supabase using only a publishable/anon key. The service-ro
 
 ## Important deployment status
 
-**This branch contains the implemented code and isolated tests; it is not a live production deployment.**
+**The frontend is deployed to Vercel production. The Supabase backend integration is not live yet: zero Edge Functions are deployed, and external provider configuration and end-to-end acceptance remain outstanding.**
 
 - The project owner confirmed Supabase project `mtrmvvtobbbjusiteyvp` as the target. It was previously verified active and healthy.
 - Seven hosted migrations were previously verified as applied. Do not reapply them.
-- No Edge Functions are currently deployed. Auth redirect settings, GitHub App, email, Telegram, AI and scheduler secrets remain unconfigured; the production frontend URL is still unknown.
+- Vercel production deployment is READY at `https://dev-ops-insight-ai.vercel.app`; the domain is verified and the production frontend has `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` configured.
+- The target Supabase project currently has zero deployed Edge Functions. The seven existing hosted migrations are applied; do not reapply them.
+- `APP_BASE_URL` should be set to `https://dev-ops-insight-ai.vercel.app` in Supabase Edge Function secrets. Supabase Auth Site URL and `/auth/callback` redirect allow-list still need to be verified/configured in the Supabase Dashboard.
+- GitHub App registration, webhook secret, alert verification pepper, scheduler secret, and any selected Resend/Telegram/AI credentials are not confirmed configured. Do not assume the corresponding integrations are operational.
 - Invitations, GitHub webhooks, AI analysis and alert delivery cannot be considered live until the operations guide setup and end-to-end checks are completed.
 - The original SQL source for the already-applied workspace foundation migration was unavailable. The file `20261112100118_create_team_workspace_foundation.sql` is a documented reconstruction from read-only catalog inspection. It was not reapplied to the existing project. Compare it with the original source before using it to provision a new database.
 - Reliability migrations are applied to the hosted database, including durable workflow-attempt history, pending-job reconciliation, shared rate-limit storage and safe alert-delivery states. The Edge Functions are still not deployed, so these behaviors are not live.
@@ -119,7 +122,7 @@ Database CI runs PostgreSQL 17.11 in an isolated GitHub Actions service containe
 
 ## Supabase and provider setup
 
-Follow docs/PHASE-3-OPERATIONS.md for project verification, migration review, Auth redirect configuration, Edge Function secrets, GitHub App permissions/webhooks, alert providers and scheduler setup.
+Follow docs/PHASE-3-OPERATIONS.md for project verification, Auth redirect configuration, Edge Function secrets, GitHub App permissions/webhooks, alert providers and scheduler setup. The currently verified frontend origin is `https://dev-ops-insight-ai.vercel.app`.
 
 Required Edge Function environment variables are listed in supabase/functions/.env.example. That file contains placeholders only. Do not copy real credentials into Git.
 
@@ -131,8 +134,8 @@ Work is organized into ordered review branches:
 3. Phase 3 — database security, GitHub monitoring, AI analysis and alerts.
 4. Phase 4 — persistent active-workspace context across monitoring pages.
 
-PR #9 (Phase 2) and PR #10 (Phase 3) are merged into their stacked parent branches. PR #8 (Phase 1 → main) remains open. PR #11 (Phase 3 reliability) and PR #12 (Phase 4 workspace context) remain open drafts; PR #12 is stacked on PR #11. Review and integrate the branch chain in dependency order rather than merging a child branch directly to main.
+PRs #8, #11, #12 and #13 are merged. PRs #9 and #10 were already merged into their stacked parent branches. PR #13 integrated Phase 3 reliability and Phase 4 into `main`.
 
-The Phase 4 head `a57e66ccdcea57affa973c73244577682e2ee6cc` passed all three GitHub Actions workflows: Frontend CI, Edge Functions CI and Database Security CI. The production-readiness register tracks the latest verification and outstanding deployment gates.
+The integrated main commit `f34a74294632d3303303ece4f7b8e98fbb1af0be` passed Frontend CI, Edge Functions CI and Database Security CI. The subsequent readiness-register documentation commit `9486d2249c78adbdba767a70bbdb01cb1e99f57b` also passed Frontend CI. The production-readiness register tracks the latest verification and outstanding deployment gates.
 
 **Release status: not production ready.** Passing CI is not evidence of live provider configuration, deployed Edge Functions or end-to-end acceptance.
