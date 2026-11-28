@@ -5,7 +5,7 @@ Repository: `Aish-369/DevOps-Insight-AI`
 Integrated branch: `main`  
 Confirmed Supabase target: `mtrmvvtobbbjusiteyvp`
 
-This register separates code/CI verification from hosted deployment and live-provider acceptance. Passing CI does not prove that GitHub, email, Telegram, AI, or browser-to-production flows are operational.
+This register separates code/CI verification from hosted deployment and live-provider acceptance. Passing CI does not prove that GitHub, email, Telegram, or browser-to-production flows are operational.
 
 ## Verified implementation and hosted database
 
@@ -49,7 +49,7 @@ The Phase 3 head `d2f970c46496367541a9b2a30e674abf3130f930` also has successful 
 - Team workspaces, invitations and owner/admin/member permissions with database-side owner invariants.
 - GitHub App installation/repository sync code and signed webhook ingestion with duplicate-delivery handling.
 - Workflow run/job persistence, workflow attempt history, out-of-order job reconciliation, stale-event protection and searchable workflow history.
-- AI failure-analysis code with bounded/redacted logs, evidence-linked recommendations, model/prompt versioning and per-team quota. It remains an assistive analysis; no automatic code changes.
+- Zero-cost deterministic failure diagnostics in the current review branch: bounded/redacted logs, known-signature matching, exact evidence excerpts and per-team quota. This is not an LLM and does not make automatic code changes.
 - Verified email/Telegram alert-channel code, branch rules, recovery alerts, flaky-retry suppression, idempotent email dispatch and conservative handling of ambiguous delivery outcomes.
 - Database-backed rate limiting for authenticated Edge Function requests.
 - Phase 4 active-workspace persistence across Teams, GitHub App Integrations and Workflow Runs pages. The user-scoped local preference stores only a workspace ID, validates it against accessible workspaces, and safely falls back if storage is blocked or the workspace is no longer available.
@@ -69,10 +69,10 @@ The Phase 3 head `d2f970c46496367541a9b2a30e674abf3130f930` also has successful 
 | Edge Function secrets | BLOCKED | Configure only the providers selected for launch in Supabase Dashboard |
 | Email alerts/invitations | NOT TESTED | Configure Resend and verified sender if email is enabled |
 | Telegram alerts | NOT TESTED | Configure bot token if Telegram is enabled |
-| AI analysis provider | NOT TESTED | Select and configure an approved OpenAI-compatible endpoint/model |
+| Zero-cost failure diagnostics | IMPLEMENTED IN REVIEW BRANCH | Validate unit tests and Edge Function CI; deploy only after all release gates are satisfied. No AI provider key is required |
 | GitHub scheduler secrets | BLOCKED | Configure `SUPABASE_FUNCTIONS_URL` and matching `ALERT_SCHEDULER_SECRET` in GitHub Actions |
 | Edge Function deployment | BLOCKED | Zero functions are deployed. Deploy only after required server-side secrets and GitHub App/provider choices are configured |
-| Live end-to-end acceptance | NOT TESTED | Test auth, invitations, RBAC, GitHub webhook, workflow ingestion, AI analysis and notifications using controlled accounts and a non-production repository |
+| Live end-to-end acceptance | NOT TESTED | Test auth, invitations, RBAC, GitHub webhook, workflow ingestion, failure diagnostics and notifications using controlled accounts and a non-production repository |
 | Ordered PR integration | COMPLETE | PRs #8, #11, #12 and #13 are merged; PR #9 and #10 had already been merged into their stacked parent branches |
 
 Never paste secret values into chat or commit them to Git. Configure secrets directly in the relevant provider dashboards.
@@ -81,7 +81,7 @@ Never paste secret values into chat or commit them to Git. Configure secrets dir
 
 - The latest Security Advisor warning is leaked-password protection disabled. The current Supabase Free plan does not include the HaveIBeenPwned password check. Do not claim this warning is fixed.
 - The private rate-limit table was previously observed with RLS disabled, but direct client grants were revoked and the schema is not exposed. No hardening SQL was applied in this session. Review the live catalog and advisor before deciding whether to enable RLS with a service-role-only policy.
-- Keep the Supabase service-role key, GitHub App private key, webhook secret, Resend key, Telegram bot token and AI provider key out of browser variables and Git history.
+- Keep the Supabase service-role key, GitHub App private key, webhook secret, Resend key, Telegram bot token and provider credentials out of browser variables and Git history.
 - Do not reapply the seven already-recorded hosted migrations.
 - The original SQL source for the pre-existing workspace foundation migration was unavailable; the repository file is a documented reconstruction. Do not use it to overwrite an existing database or provision a new database without recovering/reviewing the original source.
 

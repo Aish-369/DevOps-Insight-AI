@@ -33,10 +33,11 @@
 
 ### AI failure analysis
 - Authenticated team members can request analysis of completed unsuccessful workflow runs.
-- Logs are size-bounded and common credential patterns are redacted before they are sent to the configured OpenAI-compatible chat-completions endpoint.
-- Results are stored with evidence, proposed next steps, model/prompt version and a confidence label.
-- Daily usage is reserved by an atomic PostgreSQL function and capped per team.
-- AI output is an assistive hypothesis. It does not apply code changes automatically and must be reviewed against the original logs.
+- Logs are size-bounded and common credential patterns are redacted before analysis.
+- The current zero-cost analyzer uses deterministic log signatures (`rules-v1`) for common dependency, module, TypeScript, lint, test, permissions, network and Docker failures.
+- Results include exact verified log evidence, proposed next steps and a confidence label; unknown signatures remain low-confidence and require human review.
+- Daily analysis usage is reserved by an atomic PostgreSQL function and capped per team.
+- This implementation is deterministic diagnostics, not an LLM. It makes no hosted-model requests, requires no AI API key, and never applies code changes automatically.
 
 ### Alerts
 - Email and Telegram destinations require a verification code before they can receive alerts.
@@ -54,7 +55,7 @@
 | GitHub | GitHub App + webhooks | Repository access, workflow events, logs |
 | Email | Resend | Invitation and verified alert delivery |
 | Telegram | Telegram Bot API | Verified chat delivery |
-| AI | Configurable OpenAI-compatible endpoint | Evidence-based CI log analysis |
+| CI diagnostics | In-process deterministic rules | Evidence-backed zero-cost failure signatures |
 
 The frontend talks to Supabase using only a publishable/anon key. The service-role key and all provider secrets remain in Edge Function/server configuration and are never Vite variables.
 
@@ -67,7 +68,7 @@ The frontend talks to Supabase using only a publishable/anon key. The service-ro
 - Vercel production deployment is READY at `https://dev-ops-insight-ai.vercel.app`; the domain is verified and the production frontend has `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` configured.
 - The target Supabase project currently has zero deployed Edge Functions. The seven existing hosted migrations are applied; do not reapply them.
 - `APP_BASE_URL` should be set to `https://dev-ops-insight-ai.vercel.app` in Supabase Edge Function secrets. Supabase Auth Site URL and `/auth/callback` redirect allow-list still need to be verified/configured in the Supabase Dashboard.
-- GitHub App registration, webhook secret, alert verification pepper, scheduler secret, and any selected Resend/Telegram/AI credentials are not confirmed configured. Do not assume the corresponding integrations are operational.
+- GitHub App registration, webhook secret, alert verification pepper, scheduler secret, and optional alert-provider credentials are not confirmed configured. AI provider credentials are not required by the current zero-cost analyzer. Do not assume the corresponding integrations are operational.
 - Invitations, GitHub webhooks, AI analysis and alert delivery cannot be considered live until the operations guide setup and end-to-end checks are completed.
 - The original SQL source for the already-applied workspace foundation migration was unavailable. The file `20261112100118_create_team_workspace_foundation.sql` is a documented reconstruction from read-only catalog inspection. It was not reapplied to the existing project. Compare it with the original source before using it to provision a new database.
 - Reliability migrations are applied to the hosted database, including durable workflow-attempt history, pending-job reconciliation, shared rate-limit storage and safe alert-delivery states. The Edge Functions are still not deployed, so these behaviors are not live.
@@ -124,7 +125,7 @@ Database CI runs PostgreSQL 17.11 in an isolated GitHub Actions service containe
 
 Follow docs/PHASE-3-OPERATIONS.md for project verification, Auth redirect configuration, Edge Function secrets, GitHub App permissions/webhooks, alert providers and scheduler setup. The currently verified frontend origin is `https://dev-ops-insight-ai.vercel.app`.
 
-Required Edge Function environment variables are listed in supabase/functions/.env.example. That file contains placeholders only. Do not copy real credentials into Git.
+Required Edge Function environment variables are listed in supabase/functions/.env.example. That file contains placeholders only. The current CI diagnostics need no AI provider secret. Keep optional alert credentials out of Git.
 
 ## Repository workflow
 
