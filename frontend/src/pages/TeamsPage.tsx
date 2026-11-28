@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 
 import { supabase } from "../lib/supabase";
+import { resolveActiveWorkspaceId, saveActiveWorkspaceId } from "../lib/workspaceSelection.js";
 import "../styles/TeamsPage.css";
 
 type TeamRole = "Owner" | "Admin" | "Member";
@@ -83,6 +84,7 @@ export default function TeamsPage() {
 
   // Currently selected workspace.
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState("");
 
   // Independent search and filter states.
   const [workspaceSearch, setWorkspaceSearch] = useState("");
@@ -135,6 +137,7 @@ export default function TeamsPage() {
         setNotice("Please sign in to view your workspaces.");
         return;
       }
+      setCurrentUserId(user.id);
 
       // Read the current user's profile.
       const { data: profile, error: profileError } = await supabase
@@ -166,6 +169,7 @@ export default function TeamsPage() {
         setTeams([]);
         setPendingInvitations([]);
         setActiveTeamId(null);
+        saveActiveWorkspaceId(user.id, null);
         return;
       }
 
@@ -263,14 +267,9 @@ export default function TeamsPage() {
 
       // Preserve the selected workspace when it still exists.
       setActiveTeamId((currentId) => {
-        if (
-          currentId &&
-          mappedTeams.some((team) => team.id === currentId)
-        ) {
-          return currentId;
-        }
-
-        return mappedTeams[0]?.id ?? null;
+        const selectedId = resolveActiveWorkspaceId(user.id, currentId ?? "", mappedTeams);
+        saveActiveWorkspaceId(user.id, selectedId);
+        return selectedId;
       });
     } catch (error) {
       console.error("Workspace loading failed:", error);
@@ -391,6 +390,7 @@ export default function TeamsPage() {
       await loadTeams();
 
       setActiveTeamId(data.id);
+      saveActiveWorkspaceId(user.id, data.id);
       setTeamName("");
       setTeamDescription("");
       setWorkspaceSearch("");
@@ -704,6 +704,7 @@ export default function TeamsPage() {
                       }`}
                       onClick={() => {
                         setActiveTeamId(team.id);
+                        saveActiveWorkspaceId(currentUserId, team.id);
                         setRoleFilter("All roles");
                         setMemberSearch("");
                       }}

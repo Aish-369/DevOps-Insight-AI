@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "security:check": "node scripts/check-vite-security.mjs",
     "test:foundation": "node scripts/test-foundation-utils.mjs",
-    "test": "npm run test:foundation",
+    "test": "npm run test:foundation && npm run test:workspace-selection",
+    "test:workspace-selection": "node scripts/test-workspace-selection.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {

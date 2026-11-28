@@ -1,4 +1,5 @@
 import { requireAuth, requireTeamRole, writeAudit } from "../_shared/auth.ts";
+import { getMemberManagementDenial } from "../_shared/member-management.ts";
 import {
   assertAllowedOrigin,
   handleError,
@@ -32,7 +33,7 @@ Deno.serve(async (request: Request) => {
     if (
       !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
         .test(teamId) ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i
         .test(userId)
     ) {
       throw new HttpError(
@@ -50,13 +51,6 @@ Deno.serve(async (request: Request) => {
     }
 
     const actorRole = await requireTeamRole(context, teamId);
-    if (actorRole === "member") {
-      throw new HttpError(
-        403,
-        "TEAM_ADMIN_REQUIRED",
-        "Only team owners and administrators can manage members.",
-      );
-    }
     if (context.user.id === userId) {
       throw new HttpError(
         400,
@@ -80,30 +74,32 @@ Deno.serve(async (request: Request) => {
       );
     }
 
-    if (actorRole === "admin" && target.role !== "member") {
+    const denial = getMemberManagementDenial({
+      actorRole: actorRole as "owner" | "admin" | "member",
+      targetRole: target.role as "owner" | "admin" | "member",
+      action,
+      requestedRole,
+    });
+    if (denial) {
+      const messages: Record<string, string> = {
+        TEAM_ADMIN_REQUIRED:
+          "Only team owners and administrators can manage members.",
+        OWNER_MEMBERSHIP_PROTECTED:
+          "Owner membership cannot be changed or removed through member management.",
+        OWNER_PERMISSION_REQUIRED:
+          "Only the owner can manage administrator accounts or promote members.",
+        INVALID_ROLE:
+          "A member can be assigned only the member or admin role. Ownership transfer is a separate action.",
+      };
+      const status = denial === "INVALID_ROLE" ? 400 : 403;
       throw new HttpError(
-        403,
-        "OWNER_PERMISSION_REQUIRED",
-        "Administrators can manage member accounts only.",
+        status,
+        denial,
+        messages[denial] ?? "This membership operation is not allowed.",
       );
     }
 
     if (action === "set_role") {
-      if (requestedRole !== "member" && requestedRole !== "admin") {
-        throw new HttpError(
-          400,
-          "INVALID_ROLE",
-          "A member can be assigned only the member or admin role. Ownership transfer is a separate action.",
-        );
-      }
-      if (actorRole !== "owner" && requestedRole !== "member") {
-        throw new HttpError(
-          403,
-          "OWNER_PERMISSION_REQUIRED",
-          "Only the owner can promote a member to administrator.",
-        );
-      }
-
       const { error } = await context.admin.from("team_members")
         .update({ role: requestedRole })
         .eq("team_id", teamId)

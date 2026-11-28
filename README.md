@@ -22,12 +22,14 @@
 - Team workspaces with owner/admin/member roles.
 - Team invitations with single-use random tokens, hashed token storage, seven-day expiry, verified-email matching, revoke support, and server-side acceptance.
 - Member role management and removal. The database prevents removal/demotion of the final workspace owner.
+- Active workspace selection persists across Teams, GitHub App Integrations and Workflow Runs pages, scoped by authenticated user and validated against accessible workspaces.
 
 ### GitHub integration and monitoring
 - GitHub App installation flow bound to an authenticated workspace admin through a short-lived one-time state token.
 - Installation metadata and repository sync using short-lived GitHub installation tokens.
 - Signed GitHub webhook endpoint. It verifies the raw request body with HMAC-SHA256, rejects duplicate delivery IDs, records only a payload digest (not the raw payload), and reconciles installation, repository, workflow-run, job, push and pull-request events.
 - Team-scoped workflow history and links to the corresponding GitHub Actions run.
+- Durable workflow-attempt history, out-of-order job reconciliation, stale-event protection and shared database-backed rate limiting.
 
 ### AI failure analysis
 - Authenticated team members can request analysis of completed unsuccessful workflow runs.
@@ -60,13 +62,13 @@ The frontend talks to Supabase using only a publishable/anon key. The service-ro
 
 **This branch contains the implemented code and isolated tests; it is not a live production deployment.**
 
-- The project owner confirmed Supabase project `mtrmvvtobbbjusiteyvp` as the target. It is currently active and healthy.
-- The pre-existing workspace foundation migration and six incremental migrations are applied and verified in the hosted project. Do not reapply them.
-- No Edge Function has been deployed. Auth redirect settings, GitHub App, email, Telegram, AI and scheduler secrets remain unconfigured; the production frontend URL is still unknown.
+- The project owner confirmed Supabase project `mtrmvvtobbbjusiteyvp` as the target. It was previously verified active and healthy.
+- Seven hosted migrations were previously verified as applied. Do not reapply them.
+- No Edge Functions are currently deployed. Auth redirect settings, GitHub App, email, Telegram, AI and scheduler secrets remain unconfigured; the production frontend URL is still unknown.
 - Invitations, GitHub webhooks, AI analysis and alert delivery cannot be considered live until the operations guide setup and end-to-end checks are completed.
-- The original SQL source for the already-applied workspace foundation migration was absent from the repository. The file `20261112100118_create_team_workspace_foundation.sql` is a documented reconstruction from read-only catalog inspection. It was not reapplied to the existing project. Compare it with the original source before using it to provision a new database.
-- The reliability migration is now applied to the hosted database, including durable workflow-attempt history, pending-job reconciliation, shared rate-limit storage and safe alert-delivery states. The Edge Functions are still not deployed, so these behaviors are not yet live.
-- On the Supabase Free plan, leaked-password protection is unavailable and its Security Advisor warning remains.
+- The original SQL source for the already-applied workspace foundation migration was unavailable. The file `20261112100118_create_team_workspace_foundation.sql` is a documented reconstruction from read-only catalog inspection. It was not reapplied to the existing project. Compare it with the original source before using it to provision a new database.
+- Reliability migrations are applied to the hosted database, including durable workflow-attempt history, pending-job reconciliation, shared rate-limit storage and safe alert-delivery states. The Edge Functions are still not deployed, so these behaviors are not live.
+- The latest Supabase Security Advisor check returned one warning: leaked-password protection is disabled. This capability is unavailable on the current Supabase Free plan.
 
 ## Getting started — frontend
 
@@ -126,6 +128,11 @@ Required Edge Function environment variables are listed in supabase/functions/.e
 Work is organized into ordered review branches:
 1. Phase 1 — foundation and code quality.
 2. Phase 2 — authentication lifecycle.
-3. Phase 3 — database security and platform backend.
+3. Phase 3 — database security, GitHub monitoring, AI analysis and alerts.
+4. Phase 4 — persistent active-workspace context across monitoring pages.
 
-The implementation is organized into ordered review branches. PR #9 (Phase 2) was merged into the Phase 1 branch, and PR #10 (Phase 3) was merged into the Phase 2 branch. PR #8 (Phase 1 → main) remains open. The current Phase 3 code tree has passing Frontend, Edge Functions and Database Security CI evidence on its PR head. The phase chain has not yet been merged into `main`; review the dependency chain and deployment configuration before any main-branch merge.
+PR #9 (Phase 2) and PR #10 (Phase 3) are merged into their stacked parent branches. PR #8 (Phase 1 → main) remains open. PR #11 (Phase 3 reliability) and PR #12 (Phase 4 workspace context) remain open drafts; PR #12 is stacked on PR #11. Review and integrate the branch chain in dependency order rather than merging a child branch directly to main.
+
+The Phase 4 head `a57e66ccdcea57affa973c73244577682e2ee6cc` passed all three GitHub Actions workflows: Frontend CI, Edge Functions CI and Database Security CI. The production-readiness register tracks the latest verification and outstanding deployment gates.
+
+**Release status: not production ready.** Passing CI is not evidence of live provider configuration, deployed Edge Functions or end-to-end acceptance.
