@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { RefreshCw, GitBranch } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { resolveActiveWorkspaceId, saveActiveWorkspaceId } from "../lib/workspaceSelection.js";
 import "./PlatformPages.css";
 
 type Team = { id: string; name: string };
@@ -27,6 +28,7 @@ type Repository = {
 export default function IntegrationsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamId, setTeamId] = useState("");
+  const [userId, setUserId] = useState("");
   const [installations, setInstallations] = useState<Installation[]>([]);
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,13 +46,16 @@ export default function IntegrationsPage() {
     setLoading(true);
     setError("");
     try {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData.user) throw new Error("Your sign-in session has expired.");
+      setUserId(authData.user.id);
+
       const { data: teamRows, error: teamsError } = await supabase
         .from("teams").select("id,name").order("created_at", { ascending: true });
       if (teamsError) throw teamsError;
       const loadedTeams = (teamRows ?? []) as Team[];
-      const selectedTeamId = teamId && loadedTeams.some((team) => team.id === teamId)
-        ? teamId
-        : loadedTeams[0]?.id ?? "";
+      const selectedTeamId = resolveActiveWorkspaceId(authData.user.id, teamId, loadedTeams) ?? "";
+      saveActiveWorkspaceId(authData.user.id, selectedTeamId || null);
       setTeams(loadedTeams);
       setTeamId(selectedTeamId);
       if (!selectedTeamId) {
@@ -141,7 +146,7 @@ export default function IntegrationsPage() {
 
       <section className="platform-card">
         <label htmlFor="integration-team">Workspace</label>
-        <select id="integration-team" value={teamId} onChange={(event) => setTeamId(event.target.value)} disabled={loading || teams.length === 0}>
+        <select id="integration-team" value={teamId} onChange={(event) => { const nextId = event.target.value; setTeamId(nextId); saveActiveWorkspaceId(userId, nextId || null); }} disabled={loading || teams.length === 0}>
           {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
         </select>
         <div className="platform-actions">

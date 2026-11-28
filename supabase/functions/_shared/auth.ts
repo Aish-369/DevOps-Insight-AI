@@ -4,6 +4,7 @@ import {
   type User,
 } from "@supabase/supabase-js";
 import { HttpError } from "./http.ts";
+import { enforceUserRateLimit } from "./rate-limit.ts";
 
 export interface AuthContext {
   user: User;
@@ -118,7 +119,9 @@ export async function requireAuth(request: Request): Promise<AuthContext> {
     );
   }
 
-  return { user: data.user, admin: createAdminClient() };
+  const admin = createAdminClient();
+  await enforceUserRateLimit(admin, request, data.user.id);
+  return { user: data.user, admin };
 }
 
 export async function requireTeamRole(

@@ -22,12 +22,14 @@
 - Team workspaces with owner/admin/member roles.
 - Team invitations with single-use random tokens, hashed token storage, seven-day expiry, verified-email matching, revoke support, and server-side acceptance.
 - Member role management and removal. The database prevents removal/demotion of the final workspace owner.
+- Active workspace selection persists across Teams, GitHub App Integrations and Workflow Runs pages, scoped by authenticated user and validated against accessible workspaces.
 
 ### GitHub integration and monitoring
 - GitHub App installation flow bound to an authenticated workspace admin through a short-lived one-time state token.
 - Installation metadata and repository sync using short-lived GitHub installation tokens.
 - Signed GitHub webhook endpoint. It verifies the raw request body with HMAC-SHA256, rejects duplicate delivery IDs, records only a payload digest (not the raw payload), and reconciles installation, repository, workflow-run, job, push and pull-request events.
 - Team-scoped workflow history and links to the corresponding GitHub Actions run.
+- Durable workflow-attempt history, out-of-order job reconciliation, stale-event protection and shared database-backed rate limiting.
 
 ### AI failure analysis
 - Authenticated team members can request analysis of completed unsuccessful workflow runs.
@@ -38,8 +40,8 @@
 
 ### Alerts
 - Email and Telegram destinations require a verification code before they can receive alerts.
-- Alert rules support branch filters and recovery notifications.
-- Delivery records use deduplication keys, atomic processing claims, bounded retries and a manual dispatch action.
+- Alert rules support branch filters, recovery notifications and `skip_flaky` (suppress a failed-run alert when a later retry succeeds; a 10-minute grace period allows an immediate rerun).
+- Delivery records use deduplication keys and atomic claims. Resend email uses an idempotency key; ambiguous provider outcomes become `delivery_unknown` and are never blindly retried. Check provider logs before any manual resend.
 - A five-minute GitHub Actions scheduler is included. It only activates after the required repository secrets and Supabase Edge Function secret have been configured and the workflow is present on the default branch.
 
 ## Architecture
@@ -60,12 +62,13 @@ The frontend talks to Supabase using only a publishable/anon key. The service-ro
 
 **This branch contains the implemented code and isolated tests; it is not a live production deployment.**
 
-- The Supabase project inspected during development could not be conclusively mapped to the application because the frontend environment template is placeholder-only.
-- No migration has been applied to the connected Supabase project from this work.
-- No Edge Function has been deployed and no Auth provider, GitHub App, email, Telegram, AI or scheduler secret has been configured.
-- Sending invitations, alerts, GitHub webhooks and AI analysis therefore requires the setup in the Phase 3 operations guide.
-- The original SQL source for the already-applied workspace foundation migration was absent from the repository. The file 20261112100118_create_team_workspace_foundation.sql is a documented reconstruction from read-only catalog inspection. Review it against the original source before using it for a new database.
-- skip_flaky is currently a stored preference column; automatic flaky-run classification is not implemented in this branch.
+- The project owner confirmed Supabase project `mtrmvvtobbbjusiteyvp` as the target. It was previously verified active and healthy.
+- Seven hosted migrations were previously verified as applied. Do not reapply them.
+- No Edge Functions are currently deployed. Auth redirect settings, GitHub App, email, Telegram, AI and scheduler secrets remain unconfigured; the production frontend URL is still unknown.
+- Invitations, GitHub webhooks, AI analysis and alert delivery cannot be considered live until the operations guide setup and end-to-end checks are completed.
+- The original SQL source for the already-applied workspace foundation migration was unavailable. The file `20261112100118_create_team_workspace_foundation.sql` is a documented reconstruction from read-only catalog inspection. It was not reapplied to the existing project. Compare it with the original source before using it to provision a new database.
+- Reliability migrations are applied to the hosted database, including durable workflow-attempt history, pending-job reconciliation, shared rate-limit storage and safe alert-delivery states. The Edge Functions are still not deployed, so these behaviors are not live.
+- The latest Supabase Security Advisor check returned one warning: leaked-password protection is disabled. This capability is unavailable on the current Supabase Free plan.
 
 ## Getting started — frontend
 
@@ -112,7 +115,7 @@ Edge Functions:
     deno task fmt:check
     deno task test
 
-Database CI runs PostgreSQL 17.11 in an isolated GitHub Actions service container. It creates test-only Supabase Auth primitives, applies the reconstructed workspace baseline and all four incremental migrations, then tests RLS/privileges, sensitive-column access, foreign-key indexes, cross-team isolation, owner invariants, cascade behavior and atomic AI quota. It does not connect to or modify the hosted Supabase project.
+Database CI runs PostgreSQL 17.11 in an isolated GitHub Actions service container. It creates test-only Supabase Auth primitives and applies the reconstructed workspace baseline plus all six incremental migrations. It tests RLS/privileges, sensitive-column access, foreign-key indexes, cross-team isolation, owner invariants, cascade behavior, atomic AI quota, shared rate-limit behavior, workflow-attempt ordering and delivery-state constraints. It does not connect to or modify the hosted Supabase project.
 
 ## Supabase and provider setup
 
@@ -125,6 +128,11 @@ Required Edge Function environment variables are listed in supabase/functions/.e
 Work is organized into ordered review branches:
 1. Phase 1 — foundation and code quality.
 2. Phase 2 — authentication lifecycle.
-3. Phase 3 — database security and platform backend.
+3. Phase 3 — database security, GitHub monitoring, AI analysis and alerts.
+4. Phase 4 — persistent active-workspace context across monitoring pages.
 
-The Phase 3 branch is intended to target the Phase 2 branch. Review and merge the phases in order; do not merge Phase 3 directly to main ahead of its dependencies.
+PR #9 (Phase 2) and PR #10 (Phase 3) are merged into their stacked parent branches. PR #8 (Phase 1 → main) remains open. PR #11 (Phase 3 reliability) and PR #12 (Phase 4 workspace context) remain open drafts; PR #12 is stacked on PR #11. Review and integrate the branch chain in dependency order rather than merging a child branch directly to main.
+
+The Phase 4 head `a57e66ccdcea57affa973c73244577682e2ee6cc` passed all three GitHub Actions workflows: Frontend CI, Edge Functions CI and Database Security CI. The production-readiness register tracks the latest verification and outstanding deployment gates.
+
+**Release status: not production ready.** Passing CI is not evidence of live provider configuration, deployed Edge Functions or end-to-end acceptance.

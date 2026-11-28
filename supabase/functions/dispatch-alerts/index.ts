@@ -15,7 +15,7 @@ import {
   preflight,
   readJsonObject,
 } from "../_shared/http.ts";
-import { constantTimeEqual } from "../_shared/security.ts";
+import { constantTimeEqual, sha256Hex } from "../_shared/security.ts";
 
 const MAX_ATTEMPTS = 5;
 const STALE_CLAIM_MS = 5 * 60 * 1000;
@@ -32,6 +32,9 @@ function dueAlertFilter(now = Date.now()): string {
     "and(status.eq.failed,attempt_count.lt." + MAX_ATTEMPTS + ")",
     "and(status.eq.processing,claimed_at.lt." + staleBefore +
     ",attempt_count.lt." + MAX_ATTEMPTS + ")",
+    "and(status.eq.processing,claimed_at.lt." + staleBefore +
+    ",attempt_count.gte." + MAX_ATTEMPTS + ")",
+    "and(status.eq.sending,provider_started_at.lt." + staleBefore + ")",
   ].join(",");
 }
 
@@ -51,12 +54,49 @@ async function dispatchTeamAlerts(
   admin: SupabaseClient,
   teamId: string,
 ): Promise<DispatchSummary> {
+  const staleSendingBefore = new Date(Date.now() - STALE_CLAIM_MS)
+    .toISOString();
+  const { error: exhaustedClaimError } = await admin
+    .from("alerts_sent")
+    .update({
+      status: "failed",
+      failure_code: "MAX_ATTEMPTS_REACHED",
+    })
+    .eq("team_id", teamId)
+    .eq("status", "processing")
+    .lt("claimed_at", staleSendingBefore)
+    .gte("attempt_count", MAX_ATTEMPTS);
+  if (exhaustedClaimError) {
+    throw new HttpError(
+      500,
+      "ALERT_CLAIM_RECONCILIATION_FAILED",
+      "Exhausted alert claims could not be reconciled.",
+    );
+  }
+  const { error: staleSendingError } = await admin
+    .from("alerts_sent")
+    .update({
+      status: "delivery_unknown",
+      failure_code: "DELIVERY_OUTCOME_UNKNOWN",
+    })
+    .eq("team_id", teamId)
+    .eq("status", "sending")
+    .lt("provider_started_at", staleSendingBefore);
+  if (staleSendingError) {
+    throw new HttpError(
+      500,
+      "ALERT_DELIVERY_RECONCILIATION_FAILED",
+      "Unconfirmed alert deliveries could not be reconciled.",
+    );
+  }
+
   const { data: pending, error } = await admin
     .from("alerts_sent")
     .select(
       "id,team_id,channel_id,github_run_id,kind,dedupe_key,status,attempt_count",
     )
     .eq("team_id", teamId)
+    .lte("available_at", new Date().toISOString())
     .or(dueAlertFilter())
     .order("created_at", { ascending: true })
     .limit(25);
@@ -81,6 +121,7 @@ async function dispatchTeamAlerts(
         attempt_count: nextAttempt,
         claimed_at: attemptedAt,
         attempted_at: attemptedAt,
+        provider_started_at: null,
       })
       .eq("id", alert.id)
       .eq("team_id", teamId)
@@ -95,6 +136,7 @@ async function dispatchTeamAlerts(
     }
     if (!claim) continue;
 
+    let providerCallStarted = false;
     try {
       const [
         { data: channel, error: channelError },
@@ -142,7 +184,40 @@ async function dispatchTeamAlerts(
         run.html_url ? "Open run: " + run.html_url : "",
       ].filter(Boolean).join("\n");
 
+      if (
+        (channel.channel_type === "email" &&
+          (!Deno.env.get("RESEND_API_KEY")?.trim() ||
+            !Deno.env.get("EMAIL_FROM")?.trim())) ||
+        (channel.channel_type === "telegram" &&
+          !Deno.env.get("TELEGRAM_BOT_TOKEN")?.trim())
+      ) {
+        throw new Error("Alert provider is not configured.");
+      }
+      if (
+        channel.channel_type !== "email" && channel.channel_type !== "telegram"
+      ) {
+        throw new Error("Unsupported alert channel.");
+      }
+
+      const { data: sendingClaim, error: sendingError } = await admin
+        .from("alerts_sent")
+        .update({
+          status: "sending",
+          provider_started_at: new Date().toISOString(),
+        })
+        .eq("id", alert.id)
+        .eq("team_id", teamId)
+        .eq("status", "processing")
+        .eq("attempt_count", nextAttempt)
+        .select("id")
+        .maybeSingle();
+      if (sendingError || !sendingClaim) {
+        // A concurrent flaky-run reconciliation may have changed this row to skipped.
+        continue;
+      }
+
       let providerMessageId = "accepted";
+      providerCallStarted = true;
       if (channel.channel_type === "email") {
         providerMessageId = await sendEmail(
           channel.target,
@@ -150,11 +225,10 @@ async function dispatchTeamAlerts(
           '<pre style="white-space:pre-wrap;font-family:Arial,sans-serif">' +
             escapeHtml(summary) +
             "</pre>",
+          await sha256Hex(alert.dedupe_key),
         );
-      } else if (channel.channel_type === "telegram") {
-        providerMessageId = await sendTelegramMessage(channel.target, summary);
       } else {
-        throw new Error("Unsupported alert channel.");
+        providerMessageId = await sendTelegramMessage(channel.target, summary);
       }
 
       const { error: updateError } = await admin.from("alerts_sent")
@@ -167,24 +241,45 @@ async function dispatchTeamAlerts(
         })
         .eq("id", alert.id)
         .eq("team_id", teamId)
-        .eq("status", "processing")
+        .eq("status", "sending")
         .eq("attempt_count", nextAttempt);
 
       if (updateError) {
-        throw new Error("Alert delivery status could not be saved.");
+        await admin.from("alerts_sent").update({
+          status: "delivery_unknown",
+          failure_code: "DELIVERY_OUTCOME_UNKNOWN",
+        }).eq("id", alert.id)
+          .eq("team_id", teamId)
+          .eq("status", "sending")
+          .eq("attempt_count", nextAttempt);
+        failed += 1;
+        continue;
       }
       sent += 1;
     } catch {
-      await admin.from("alerts_sent").update({
-        status: "failed",
-        attempted_at: attemptedAt,
-        failure_code: nextAttempt >= MAX_ATTEMPTS
-          ? "MAX_ATTEMPTS_REACHED"
-          : "PROVIDER_DELIVERY_FAILED",
-      }).eq("id", alert.id)
-        .eq("team_id", teamId)
-        .eq("status", "processing")
-        .eq("attempt_count", nextAttempt);
+      if (providerCallStarted) {
+        // Telegram has no send idempotency key. A timeout or DB failure after
+        // the provider call may mean the message was accepted; never auto-retry.
+        await admin.from("alerts_sent").update({
+          status: "delivery_unknown",
+          attempted_at: attemptedAt,
+          failure_code: "DELIVERY_OUTCOME_UNKNOWN",
+        }).eq("id", alert.id)
+          .eq("team_id", teamId)
+          .eq("status", "sending")
+          .eq("attempt_count", nextAttempt);
+      } else {
+        await admin.from("alerts_sent").update({
+          status: "failed",
+          attempted_at: attemptedAt,
+          failure_code: nextAttempt >= MAX_ATTEMPTS
+            ? "MAX_ATTEMPTS_REACHED"
+            : "PROVIDER_NOT_ATTEMPTED",
+        }).eq("id", alert.id)
+          .eq("team_id", teamId)
+          .eq("status", "processing")
+          .eq("attempt_count", nextAttempt);
+      }
       failed += 1;
     }
   }

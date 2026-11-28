@@ -1,0 +1,7 @@
+-- Historical placeholder retained to avoid deleting a tracked migration path.
+-- The SQL from this file was applied to the confirmed hosted Supabase project
+-- and recorded by Supabase as migration 20261125134153_reliable_event_delivery.
+-- The canonical, version-aligned migration is:
+--   20261125134153_reliable_event_delivery.sql
+-- Keep this file intentionally empty so fresh databases do not apply the same
+-- DDL twice. Database Security CI applies the canonical migration file.
