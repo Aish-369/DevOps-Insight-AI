@@ -92,21 +92,6 @@ Deno.serve(async (request: Request) => {
     }
 
     if (action === "set_role") {
-      if (requestedRole !== "member" && requestedRole !== "admin") {
-        throw new HttpError(
-          400,
-          "INVALID_ROLE",
-          "A member can be assigned only the member or admin role. Ownership transfer is a separate action.",
-        );
-      }
-      if (actorRole !== "owner" && requestedRole !== "member") {
-        throw new HttpError(
-          403,
-          "OWNER_PERMISSION_REQUIRED",
-          "Only the owner can promote a member to administrator.",
-        );
-      }
-
       const { error } = await context.admin.from("team_members")
         .update({ role: requestedRole })
         .eq("team_id", teamId)
