@@ -50,29 +50,34 @@ Set the following project-level values in **Supabase Dashboard → Edge Function
 | `RESEND_API_KEY` | Email provider credential |
 | `EMAIL_FROM` | Verified sender address/domain for Resend |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot credential (only if Telegram alerts are enabled) |
-| `AI_API_URL` | Full HTTPS OpenAI-compatible chat-completions endpoint |
-| `AI_API_KEY` | AI provider credential |
-| `AI_MODEL` | Model identifier supported by that endpoint |
+| *(none)* | CI diagnostics use local deterministic rules; no AI provider secret is required |
 
 Only set provider credentials for providers the product will actually use. Resend/Telegram/AI providers may have their own free quotas and limits; confirm those separately. Supabase Edge Function secrets are not Vite variables.
 
-## 3A. Recommended AI provider and model
+## 3A. Zero-cost CI failure analysis
 
-**Selected default: Vercel AI Gateway + OpenAI GPT-6.2 Sol** (`openai/gpt-6.2-sol`).
+**Non-negotiable budget: ₹0 / $0.** The current implementation uses deterministic, in-process log signatures (rules-v1) inside the Supabase Edge Function. It does not call OpenAI, Vercel AI Gateway, Hugging Face, or any other hosted model. It requires no AI API key, payment method, autopay, credits, or billing setup.
 
-Why this choice:
-- The existing Edge Function already uses an OpenAI-compatible Chat Completions endpoint, so Gateway can be adopted by changing configuration rather than introducing a new SDK or provider-specific client.
-- GPT-6.2 Sol is the current higher-capability Sol tier suited to complex coding/investigation workflows; CI failure root-cause analysis needs stronger reasoning than a low-cost classification-only model.
-- Gateway gives one server-side credential, provider/model routing and usage visibility. The published model listing currently shows about $2 per million input tokens and $10 per million output tokens; prices can change and long-context rates may differ.
-- Gateway documents per-request prompt-training restrictions for supported providers. Enable the documented no-prompt-training control for requests containing private CI logs. Do not assume Zero Data Retention is available on the current Vercel plan; ZDR has plan/provider restrictions.
+What it does:
+- Detects a bounded set of recognizable signatures such as npm dependency conflicts, missing modules, TypeScript diagnostics, lint failures, test failures, permission errors, network failures and Docker build errors.
+- Returns a cause and suggested next steps only when a known signature is present.
+- Includes an exact excerpt from the already-redacted workflow logs as evidence.
+- Uses medium confidence for a matched rule and low confidence with no asserted root cause when no rule matches.
+- Stores the analyzer identity as rules-v1; it must not be represented in the UI or reports as an LLM-generated answer.
 
-Configuration for the existing OpenAI-compatible function:
-- `AI_API_URL=https://ai-gateway.vercel.sh/v1/chat/completions`
-- `AI_MODEL=openai/gpt-6.2-sol`
-- Store the Vercel AI Gateway API key in Supabase Edge Function secret `AI_API_KEY` (the existing function variable name); never put it in a `VITE_` variable.
-- Keep the existing bounded-log handling and credential redaction. Verify the no-prompt-training request option is actually accepted by the Chat Completions endpoint before enabling real customer logs.
+Important limitations:
+- This is deterministic diagnostics, **not generative AI**. It cannot understand arbitrary logs or reason beyond the implemented signatures.
+- A low-confidence/unknown result requires human investigation. Do not invent causes or claim AI reasoning.
+- The existing per-team daily analysis allowance remains as an abuse/cost-control limit even though this analyzer makes no model API calls.
+- Any future model integration is out of scope until it can be demonstrated to remain strictly free with no payment method, no autopay and no paid fallback. Do not add credentials or enable billing.
 
-**Cost guard:** Vercel documents $5 recurring monthly AI Gateway credits for eligible free users, but obtaining those credits requires a valid payment method. Gateway budgets reject requests after the configured limit, but do not create credits. Do not add a payment method, purchase credits, create a paid key, or enable billing without the project owner's explicit approval. First run a controlled synthetic-log benchmark and inspect actual token usage/cost.
+## 3B. Zero-cost operating policy
+
+- Keep Supabase and Vercel on their existing Free/Hobby plans. Do not create paid branches, upgrade plans, enable paid compute or deploy paid add-ons.
+- Use only GitHub Free capabilities and free-tier provider options where no payment method is required.
+- Email/Telegram delivery is optional. If a provider requires a card, paid plan or billable usage, leave that channel disabled; do not silently substitute a paid provider.
+- When a free quota or platform limit is reached, stop or defer the affected operation and show a clear unavailable/limit state. Never trigger a paid fallback.
+- Do not create AI Gateway keys, paid model keys, credits, billing budgets, payment methods or autopay.
 
 ## 4. Frontend and scheduler configuration
 
