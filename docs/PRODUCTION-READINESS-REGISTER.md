@@ -1,8 +1,8 @@
 # Production Readiness Register
 
-Last reviewed: 2026-11-27  
+Last reviewed: 2026-11-28  
 Repository: `Aish-369/DevOps-Insight-AI`  
-Working branch: `codex/phase4-workspace-context-2026-11-27`  
+Integrated branch: `main`  
 Confirmed Supabase target: `mtrmvvtobbbjusiteyvp`
 
 This register separates code/CI verification from hosted deployment and live-provider acceptance. Passing CI does not prove that GitHub, email, Telegram, AI, or browser-to-production flows are operational.
@@ -30,11 +30,11 @@ This register separates code/CI verification from hosted deployment and live-pro
 
 ## CI verification
 
-All three GitHub Actions workflows passed on Phase 4 head `a57e66ccdcea57affa973c73244577682e2ee6cc`:
+All three GitHub Actions workflows passed on the Phase 4 head `3a329423e66142aaa88589fbaf950f37c02ee34f` and the integration PR head `fb138a17aebb72d31927aa2403ec8aa28b8b4a8c`. The integration PR's checks were:
 
-- [Frontend CI](https://github.com/Aish-369/DevOps-Insight-AI/actions/runs/46013723272) — success.
-- [Edge Functions CI](https://github.com/Aish-369/DevOps-Insight-AI/actions/runs/46013723135) — success.
-- [Database Security CI](https://github.com/Aish-369/DevOps-Insight-AI/actions/runs/46013723245) — success.
+- [Frontend CI](https://github.com/Aish-369/DevOps-Insight-AI/actions/runs/46153913538) — success (includes browser regression tests and source bundle).
+- [Edge Functions CI](https://github.com/Aish-369/DevOps-Insight-AI/actions/runs/46153913540) — success (Deno typecheck, lint, formatting and unit tests).
+- [Database Security CI](https://github.com/Aish-369/DevOps-Insight-AI/actions/runs/46153913549) — success (PostgreSQL 17 RLS/privilege integration tests).
 
 The Phase 3 head `d2f970c46496367541a9b2a30e674abf3130f930` also has successful Frontend, Edge Functions and Database Security workflow runs. CI validates the code and isolated tests; it does not deploy Edge Functions or validate external providers.
 
@@ -49,7 +49,7 @@ The Phase 3 head `d2f970c46496367541a9b2a30e674abf3130f930` also has successful 
 - Database-backed rate limiting for authenticated Edge Function requests.
 - Phase 4 active-workspace persistence across Teams, GitHub App Integrations and Workflow Runs pages. The user-scoped local preference stores only a workspace ID, validates it against accessible workspaces, and safely falls back if storage is blocked or the workspace is no longer available.
 - Focused workspace-selection tests: 10 assertions passed.
-- Member-management authorization was extracted into a pure RBAC policy module and wired into the Edge Function. Twelve focused Deno test cases cover owner/admin/member permissions, owner immutability, and invalid role assignments. These new tests are committed but awaiting GitHub Actions execution; do not mark them passed until CI reports success.
+- Member-management authorization was extracted into a pure RBAC policy module and wired into the Edge Function. Twelve focused Deno test cases cover owner/admin/member permissions, owner immutability, and invalid role assignments; the Deno unit-test workflow passed on the Phase 4 head.
 - No Supabase schema, hosted rows, provider secrets, Auth settings or Edge Function deployments were changed for Phase 4.
 
 ## Deployment blockers and owner inputs
@@ -68,7 +68,7 @@ The Phase 3 head `d2f970c46496367541a9b2a30e674abf3130f930` also has successful 
 | GitHub scheduler secrets | BLOCKED | Configure `SUPABASE_FUNCTIONS_URL` and matching `ALERT_SCHEDULER_SECRET` in GitHub Actions |
 | Edge Function deployment | BLOCKED | Deploy after origin, secrets and final code review are complete |
 | Live end-to-end acceptance | NOT TESTED | Test auth, invitations, RBAC, GitHub webhook, workflow ingestion, AI analysis and notifications using controlled accounts and a non-production repository |
-| Ordered PR integration | BLOCKED | Review and merge the dependency chain in order; do not merge stacked PRs out of order |
+| Ordered PR integration | COMPLETE | PRs #8, #11, #12 and integration PR #13 are merged; PR #9 and #10 had already been merged into their stacked parent branches |
 
 Never paste secret values into chat or commit them to Git. Configure secrets directly in the relevant provider dashboards.
 
@@ -82,15 +82,16 @@ Never paste secret values into chat or commit them to Git. Configure secrets dir
 
 ## Git branch / review state
 
-- PR #8 (Phase 1 to `main`) remains open.
-- PR #9 (Phase 2) and PR #10 (Phase 3) are merged into their stacked parent branches.
-- PR #11 (Phase 3 reliability) remains open and draft.
-- PR #12 (Phase 4 workspace context) remains open and draft, stacked on PR #11.
-- Phase 4 CI is green, but the PR chain has not been fully integrated into `main`.
-- Do not merge PRs, alter production Auth/security settings, deploy Edge Functions or configure provider credentials without the required review and explicit release approval.
+- PR #8 (Phase 1 to `main`) is merged.
+- PR #9 (Phase 2) and PR #10 (Phase 3) were merged into their stacked parent branches.
+- PR #11 (Phase 3 reliability) and PR #12 (Phase 4 workspace context) are merged in dependency order.
+- PR #13 integrated Phase 3 reliability and Phase 4 into `main`; merged commit: `f34a74294632d3303303ece4f7b8e98fbb1af0be`.
+- The integration PR passed Frontend, Edge Functions and Database Security CI. Main-branch Frontend CI was re-triggered by the merge and must be checked independently.
+- Legacy PR #7 remains open but has merge conflicts and contains an older, broad UI snapshot; it was not included in the Phase 1–4 integration.
+- Repository code is integrated. Hosted deployment and external-provider acceptance remain separate release steps.
 
 ## Release decision
 
-**NOT PRODUCTION READY — PROVIDER CONFIGURATION, ORDERED PR INTEGRATION, EDGE FUNCTION DEPLOYMENT AND LIVE ACCEPTANCE REMAIN.**
+**NOT PRODUCTION READY — PROVIDER CONFIGURATION, EDGE FUNCTION DEPLOYMENT AND LIVE ACCEPTANCE REMAIN.**
 
 Change this decision only after the final merged commit passes CI, frontend hosting and Auth redirects are configured, secrets are safely provisioned, Edge Functions are deployed, and end-to-end acceptance tests pass.
