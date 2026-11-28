@@ -49,6 +49,7 @@ The Phase 3 head `d2f970c46496367541a9b2a30e674abf3130f930` also has successful 
 - Database-backed rate limiting for authenticated Edge Function requests.
 - Phase 4 active-workspace persistence across Teams, GitHub App Integrations and Workflow Runs pages. The user-scoped local preference stores only a workspace ID, validates it against accessible workspaces, and safely falls back if storage is blocked or the workspace is no longer available.
 - Focused workspace-selection tests: 10 assertions passed.
+- Member-management authorization was extracted into a pure RBAC policy module and wired into the Edge Function. Twelve focused Deno test cases cover owner/admin/member permissions, owner immutability, and invalid role assignments. These new tests are committed but awaiting GitHub Actions execution; do not mark them passed until CI reports success.
 - No Supabase schema, hosted rows, provider secrets, Auth settings or Edge Function deployments were changed for Phase 4.
 
 ## Deployment blockers and owner inputs
