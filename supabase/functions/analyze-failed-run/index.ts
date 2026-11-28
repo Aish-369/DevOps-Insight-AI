@@ -281,20 +281,6 @@ Deno.serve(async (request: Request) => {
     const model = "rules-v1";
     const tokensIn: number | null = null;
     const tokensOut: number | null = null;
-    const usage =
-      typeof providerResult === "object" && providerResult !== null &&
-        "usage" in providerResult
-        ? (providerResult as { usage?: unknown }).usage
-        : null;
-    const tokensIn =
-      typeof usage === "object" && usage !== null && "prompt_tokens" in usage
-        ? Number((usage as { prompt_tokens?: unknown }).prompt_tokens)
-        : null;
-    const tokensOut = typeof usage === "object" && usage !== null &&
-        "completion_tokens" in usage
-      ? Number((usage as { completion_tokens?: unknown }).completion_tokens)
-      : null;
-
     const { data: saved, error: saveError } = await context.admin.from(
       "failure_analyses",
     ).insert({
